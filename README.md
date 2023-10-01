@@ -62,7 +62,7 @@ The library defines several handy constants of type `val_t`:
 
 ## 🙋‍♂️ Contributing
 
-Contributions, issues, and feature requests are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get started.
+Contributions, issues, and feature requests are welcome! 
 
 ## 📜 License
 
