@@ -111,10 +111,12 @@ static inline  float  valtofloat(val_t v)   { return (float)valtodouble(v);}
 
 static inline  _Bool  valtobool(val_t v)    { return (_Bool)(v&1);}
 
+#define VAL_SIGNED_MASK ((val_t)0x0001800000000000)
 static inline   long  valtointeger(val_t v) { long ret = (v & VAL_PAYLOAD); 
-                                              if ( (v & (val_t)0x0001800000000000) == (val_t)0x0001800000000000) 
-                                                  ret |= (val_t)0xFFFF000000000000; // if signed, extend sign
-                                              return ret; }
+                                              if ( (v & VAL_SIGNED_MASK) == VAL_SIGNED_MASK) // if signed and negative
+                                                  ret |= (val_t)0xFFFF000000000000;          // then extend sign
+                                              return ret;
+                                            }
 
 #define valtostring(v) ((char *)valtopointer(v))
 #define valtovec(v)    ((vec_t)valtopointer(v))
@@ -135,7 +137,7 @@ static inline   val_t val_nilstr() {static char *s=""; return val_fromstr(s);}
 #define VALSTRING   6
 #define VALVEC      7
 
-static inline valtype(val_t v) {
+static inline int valtype(val_t v) {
   if (valisdouble(v))  return VALDOUBLE;
   if (valisinteger(v)) return VALINTEGER;
   if (valisbool(v))    return VALBOOL;
