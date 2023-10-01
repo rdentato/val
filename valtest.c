@@ -14,8 +14,6 @@ int main(int argc, char *argv[])
    x = val(12);
    check(valisinteger(x));
 
-//   fprintf(stderr,"%016lX %016lX %d diff: %016lX\n",x,x & (val_t)0x7FFFF00000000000, (x & (val_t)0x7FFFF00000000000) == (val_t)0x7FFFF00000000000, ((x & (val_t)0x7FFFF00000000000)) - (val_t)0x7FFFF00000000000);
-
    x = val(true);
    check(valisbool(x));
 
@@ -35,13 +33,11 @@ int main(int argc, char *argv[])
 
    long r = valtointeger(x);
    check(r == -2);
-  // fprintf(stderr,"%016lX %016lX\n",x,r);
  
    // This must be different because only 48 bits are allowed
    x = val((unsigned long)-2);
    unsigned long u = valtointeger(x);
    check(u != -2);
-//   fprintf(stderr,"%016lX %016lX\n",x,u);
 
    x = valnil;
    check(valisnil(x));
@@ -50,18 +46,12 @@ int main(int argc, char *argv[])
    check(valisdouble(x));
    check(valtodouble(x) == 0.0);
    check(valiszero(x));
-   //fprintf(stderr,"%016lX\n",x);
 
    x = val(NULL);
    check(valispointer(x));
    check(valtopointer(x) == NULL);
    check(valiszero(x));
-   //fprintf(stderr,"%016lX\n",x);
-
-  //fprintf(stderr,"%016lX %016lX %016lX\n",x,u,r);
 
    x = val("Hello!");
    check(strcmp("Hello!",valtostring(x)) == 0);
-
-
 }
