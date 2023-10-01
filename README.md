@@ -59,17 +59,6 @@ The library defines several handy constants of type `val_t`:
 - `valnilpointer`
 - `valnilstr`
 
-## 📚 Documentation
-
-For a detailed guide on how to integrate and utilize `val` in your C projects, please refer to the [documentation](docs/).
-
-## 🔧 Installation & Building
-
-Clone the repository and use your preferred method to integrate the `val` library into your project. 
-
-```shell
-git clone https://github.com/[username]/val.git
-```
 
 ## 🙋‍♂️ Contributing
 
@@ -79,8 +68,4 @@ Contributions, issues, and feature requests are welcome! See [CONTRIBUTING.md](C
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 
-## 🤝 Acknowledgments
 
-- JavaScript engines like V8, SpiderMonkey, and JavaScriptCore for inspiring NaNboxing implementation.
-```
-Note: Make sure to replace placeholders like `[username]` with actual GitHub usernames or relevant links. Similarly, if additional documents like `CONTRIBUTING.md` or `docs/` directory are mentioned, ensure they are available in the repository or adjust the README.md accordingly.
