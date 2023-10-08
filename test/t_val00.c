@@ -34,6 +34,10 @@ int main(int argc, char *argv[])
    long r = valtointeger(x);
    check(r == -2);
  
+   x = val((long)-2);
+   long s = valtointeger(x);
+   check(s == -2);
+
    // This must be different because only 48 bits are allowed
    x = val((unsigned long)-2);
    unsigned long u = valtointeger(x);
@@ -54,4 +58,9 @@ int main(int argc, char *argv[])
 
    x = val("Hello!");
    check(strcmp("Hello!",valtostring(x)) == 0);
+
+   check(valisinteger(3));
+   check(!valisinteger(3.5));
+   check(valisdouble(3.5));
+
 }
