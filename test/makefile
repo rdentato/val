@@ -10,7 +10,7 @@ STATIC=
 endif
 
 CFLAGS=-O2 -Wall -I../src $(STATIC) -DDEBUG
-LIBS=-lm
+LIBS=
 
 TESTS_SRC=$(wildcard t_*.c)
 TESTS=$(TESTS_SRC:.c=)
@@ -24,22 +24,22 @@ all: $(TESTS)
 SRCDIR=../src
 
 runtest: all
-	@echo > test.out
-	@for f in $(TESTS); do echo "TEST: $$f" >> test.out ; ./$$f 2>> test.out; done 
-	@echo -n "PASS: `grep 'PASS:' test.out | wc -l`  "
-	@echo "FAIL: `grep 'FAIL:' test.out | wc -l`"
+	@rm -f test.log
+	@for f in $(TESTS); do echo "FILE ▷ $$f" >> test.log ; ./$$f 2>> test.log; done 
+	@echo -n "LOG: test.log  PASS: `grep '^PASS│' test.log | wc -l`  "
+	@echo    "FAIL: `grep '^FAIL│' test.log | wc -l`"
 
 
-%.o: %.c 
-	$(CC) $(CFLAGS) -c $< -o $@
+#%.o: %.c 
+#	$(CC) $(CFLAGS) -c $< -o $@
 
-%: %.o ../src/tns.o
-	$(CC) $(CFLAGS) $< ../src/tns.o -o $* $(LIBS)
+%: %.c 
+	$(CC) $(CFLAGS) $< -o $* $(LIBS)
 
-.PRECIOUS: %.o
+#.PRECIOUS: %.o
 
 clean:
-	rm -f $(TESTS) $(TESTS:=.exe) $(TESTS:=.o) $(SRCDIR)/tns.o test.out
+	rm -f $(TESTS) $(TESTS:=.exe) $(TESTS:=.o) test.log
 
 cleanall: clean
 	make -C $(SRCDIR) clean
