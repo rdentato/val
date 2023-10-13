@@ -50,7 +50,7 @@ typedef struct vec_s *vec_t;
 #define VAL_BOOL_MASK ((uint64_t)0x7FFD000000000000)
 
 // Check the type of a val_t variable
-#define valisinteger(x) ((val(x).v & VAL_UNS_MASK)  == VAL_UNS_MASK)
+#define valisinteger(x) ((val(x).v & (uint64_t)0xFFFE000000000000) == VAL_UNS_MASK)
 #define valissigned(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_INT_MASK)
 #define valisbool(x)    ((val(x).v & (uint64_t)0xFFFFFFFFFFFFFFFE) == VAL_BOOL_MASK)
 #define valisdouble(x)  ((val(x).v & VAL_NAN_MASK) != VAL_NAN_MASK)
