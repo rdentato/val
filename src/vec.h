@@ -47,29 +47,91 @@ typedef struct vec_s {
 
    vec_t vecnew();
    vec_t vecfree(vec_t v);
-uint32_t veccount(vec_t v);
+
+#define veccount(v) (v->cnt)
+#define vecsize(v) (v->sze)
+
 uint32_t vecclear(vec_t v);
 
-#define vecadd(v,x) vec_set(v,VECNONDX,x)
+/**
+ * @brief Set a value at the specified index in the vector, possibly adjusting its size.
+ *
+ * The function `vecset` is designed to set the value `x` of type `val_t` at the 
+ * specified index `i` within the vector `v` of type `vec_t`. If `i` is equal to 
+ * `VECNONDX`, the function will append the value `x` at the end of the vector.
+ * The function ensures that there is enough room in the vector to 
+ * perform the operation (or fails if there's not enough room).
+ *
+ * @param v The vector in which the value will be set. 
+ *
+ * @param i The index at which the value will be set. If `i` equals `VECNONDX`, 
+ *          the value will be set at the index equal to current count of elements
+ *          in `v` resulting in appending x at the end of the vector.
+ *          It must be a non-negative integer.
+ *
+ * @param x The value to be set at index `i` in vector `v`.
+ *
+ * @return The index at which the value was set or `VECNONDX` in case of failure,
+ *
+ * @note The function `makeroom` is called to ensure that there is enough room 
+ *       in `v` to set the value `x` at index `i`. 
+ *
+ * Example usage:
+ * @code
+ *     vec_t my_vector = vecnew() // some initialized vector
+ *     uint32_t index = 3;
+ *     val_t new_value = val(5.4) // value to set
+ *     uint32_t set_index = vecset(my_vector, index, new_value);
+ * @endcode
+ */
 
-#define vecset(v,i,x) vec_set(v,i,val(x))
+#define  vecset(...)      VEC_vrg(vec_set_,__VA_ARGS__)
+#define  vec_set_2(v,x)   vec_set(v,VECNONDX,val(x))
+#define  vec_set_3(v,i,x) vec_set(v,i,val(x))
 uint32_t vec_set(vec_t v, uint32_t i, val_t x);
 
-#define vecget(...) vec_get(vec_get_,__VA_ARGS__)
+/**
+ * @brief Retrieve an element from the vector at the specified index.
+ *
+ * This function retrieves the value at the specified index `i` 
+ * from the vector `v`. If `i` is out of bounds, the function 
+ * returns `valnil` and sets `errno`. Users should  ensure that `i`
+ * is within the valid range of indices for the vector.
+ *
+ * @param v The vector from which to retrieve the value.
+ *
+ * @param i The index of the element to retrieve. It is of type `uint32_t`,
+ *          ensuring that only non-negative integer values are valid.
+ *          If it is unspecified (`vecget(v)`),  the last element of the
+ *          vector will be returned.
+ *
+ * @return The value of type `val_t` stored at index `i` in the vector `v`,
+ *         or `valnil` upon error.
+ *
+ * Example usage:
+ * @code
+ *     vec_t my_vector = ... // some initialized vector
+ *     uint32_t index = 3;
+ *     val_t value = vecget(my_vector, index);
+ * @endcode
+ *
+ */
+#define vecget(...) VEC_vrg(vec_get_,__VA_ARGS__)
 #define vec_get_1(v) vec_get_2(v,VECNONDX)
-   val_t vec_get_2(vec_t v, uint32_t i);
+  val_t vec_get_2(vec_t v, uint32_t i);
 
-   val_t vecdel(vec_t v, uint32_t i);
+#define vecdel(...) VEC_vrg(vec_del_,__VA_ARGS__)
+#define vec_del_1(v) vec_del_2(v,VECNONDX)
+  val_t vec_del_2(vec_t v, uint32_t i);
+
+#define vecadd(v,x) vec_set(v,VECNONDX,val(x))
 
 #define vecins(v,i,x) vec_ins(v,i,val(x))
 uint32_t vec_ins(vec_t v, uint32_t i, val_t x);
 
-#define vecpush(v,i,x) vec_push(v,i,val(x))
-uint32_t vec_push(vec_t v, val_t x);
-   val_t vectop(vec_t v);
-   val_t vecpop(vec_t v);
-   
-   val_t vecdrop(vec_t v);
+#define vecpush(v,x) vec_set(v,VECNONDX,val(x))
+  val_t vectop(vec_t v);
+  val_t vecpop(vec_t v);
 
 #define vecenq(v,x) vec_enq(v,val(x))
 uint32_t vec_enq(vec_t v, val_t x);

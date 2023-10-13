@@ -40,7 +40,7 @@ typedef struct vec_s *vec_t;
 
 // Some bitmask
 #define VAL_TYPE_MASK ((uint64_t)0xFFFF000000000000)
-#define VAL_NANMASK   ((uint64_t)0x7FFC000000000000)
+#define VAL_NAN_MASK  ((uint64_t)0x7FFC000000000000)
 #define VAL_PAYLOAD   ((uint64_t)0x0000FFFFFFFFFFFF)
 #define VAL_PTR_MASK  ((uint64_t)0xFFFD000000000000)
 #define VAL_VEC_MASK  ((uint64_t)0xFFFE000000000000)
@@ -53,7 +53,7 @@ typedef struct vec_s *vec_t;
 #define valisinteger(x) ((val(x).v & VAL_UNS_MASK)  == VAL_UNS_MASK)
 #define valissigned(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_INT_MASK)
 #define valisbool(x)    ((val(x).v & (uint64_t)0xFFFFFFFFFFFFFFFE) == VAL_BOOL_MASK)
-#define valisdouble(x)  ((val(x).v & VAL_NANMASK) != VAL_NANMASK)
+#define valisdouble(x)  ((val(x).v & VAL_NAN_MASK) != VAL_NAN_MASK)
 #define valispointer(x) ((val(x).v & VAL_TYPE_MASK) == VAL_PTR_MASK)
 #define valisstring(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_STR_MASK)
 #define valisvec(x)     ((val(x).v & VAL_TYPE_MASK) == VAL_VEC_MASK)
