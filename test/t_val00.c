@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
        tstcheck(valisdouble(3.5));
      }
   
+  
      tstcase("Check conversion") {
        float x_f = valtofloat(x);
   
@@ -38,11 +39,14 @@ int main(int argc, char *argv[])
   
        long r = valtointeger(x);
        tstcheck(r == -2);
-   
+       
        x = val((long)-2);
        long s = valtointeger(x);
        tstcheck(s == -2);
-  
+
+       tstcheck(valtointeger(3) == 3);
+       tstcheck(valtodouble(3.5) == 3.5);
+
        // This must be different because only 48 bits are allowed
        x = val((unsigned long)-2);
        unsigned long u = valtointeger(x);
