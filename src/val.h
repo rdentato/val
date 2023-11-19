@@ -35,8 +35,16 @@
 //          7FF8
 
 typedef struct {uint64_t v;} val_t;
+typedef struct {val_t v;} val_owner_t;
 typedef struct {char *s;} chs_t;
 typedef struct vec_s *vec_t;
+
+typedef struct val_blk_s {
+  void *dta;
+  uint32_t sze;
+  uint32_t cnt;
+} val_blk_t;
+
 
 // Some bitmask
 #define VAL_TYPE_MASK ((uint64_t)0xFFFF000000000000)
@@ -44,15 +52,17 @@ typedef struct vec_s *vec_t;
 #define VAL_PAYLOAD   ((uint64_t)0x0000FFFFFFFFFFFF)
 #define VAL_PTR_MASK  ((uint64_t)0xFFFD000000000000)
 #define VAL_VEC_MASK  ((uint64_t)0xFFFE000000000000)
+#define VAL_BLK_MASK  ((uint64_t)0xFFFC000000000000)
 #define VAL_STR_MASK  ((uint64_t)0xFFFF000000000000)
 #define VAL_INT_MASK  ((uint64_t)0x7FFF000000000000)
 #define VAL_UNS_MASK  ((uint64_t)0x7FFE000000000000)
 #define VAL_CST_MASK  ((uint64_t)0xFFF8FFFFFFFFFF00)
+#define VAL_BOL_MASK  ((uint64_t)0xFFF8FFFFFFFFFF00)
 
 // Check the type of a val_t variable
 #define valisinteger(x) ((val(x).v & (uint64_t)0xFFFE000000000000) == VAL_UNS_MASK)
 #define valissigned(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_INT_MASK)
-#define valisbool(x)    ((val(x).v & (uint64_t)0xFFFFFFFFFFFFFFFE) == VAL_CST_MASK )
+#define valisbool(x)    ((val(x).v & (uint64_t)0xFFFFFFFFFFFFFFFE) == VAL_BOL_MASK )
 #define valisdouble(x)  ((val(x).v & VAL_NAN_MASK) != VAL_NAN_MASK)
 #define valispointer(x) ((val(x).v & VAL_TYPE_MASK) == VAL_PTR_MASK)
 #define valisstring(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_STR_MASK)
@@ -72,14 +82,16 @@ static inline val_t val_fromshort(short v)           {val_t ret; ret.v = VAL_INT
 static inline val_t val_fromushort(unsigned short v) {val_t ret; ret.v = VAL_UNS_MASK | ((uint64_t)v);                  return ret;}
 static inline val_t val_fromlong(long v)             {val_t ret; ret.v = VAL_INT_MASK | ((uint64_t)(v) & VAL_PAYLOAD);  return ret;}
 static inline val_t val_fromulong(unsigned long v)   {val_t ret; ret.v = VAL_UNS_MASK | ((uint64_t)(v) & VAL_PAYLOAD);  return ret;}
-static inline val_t val_frombool(_Bool v)            {val_t ret; ret.v = VAL_CST_MASK | ((uint64_t)((v) & 1));          return ret;}
+static inline val_t val_frombool(_Bool v)            {val_t ret; ret.v = VAL_BOL_MASK | ((uint64_t)((v) & 1));          return ret;}
 static inline val_t val_fromptr(void *v)             {val_t ret; ret.v = VAL_PTR_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
 static inline val_t val_fromstr(void *v)             {val_t ret; ret.v = VAL_STR_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
 static inline val_t val_fromvec(void *v)             {val_t ret; ret.v = VAL_VEC_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
+static inline val_t val_fromblk(void *v)             {val_t ret; ret.v = VAL_BLK_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
 
 static inline val_t val_fromdouble(double v)         {val_t ret; memcpy(&ret,&v,sizeof(val_t)); return ret;}
 static inline val_t val_fromfloat(float f)           {return val_fromdouble((double)f);}
 
+static inline val_t val_fromvalowner(val_owner_t v)  {val_t ret; ret.v = (v.v.v) & (uint64_t)0xFFFFFFFFFFFFFFFE; return ret;}
 static inline val_t val_fromval(val_t v)             {return v;}
 
 #define val_(x) _Generic((x), int: val_fromint,    \
@@ -94,7 +106,9 @@ static inline val_t val_fromval(val_t v)             {return v;}
                            double: val_fromdouble, \
                             float: val_fromfloat,  \
                             val_t: val_fromval,    \
+                      val_owner_t: val_fromvalowner,\
                             vec_t: val_fromvec,    \
+                        val_blk_t: val_fromblk,    \
                   unsigned char *: val_fromstr,    \
                            char *: val_fromstr,    \
                            void *: val_fromptr) (x)
@@ -126,6 +140,7 @@ static inline   void *val_topointer(val_t v, uint64_t mask) { return (void *)((u
 #define valtopointer(v) val_to_pointer(v,VAL_PAYLOAD)
 #define valtostring(v) ((char *)valtopointer(v))
 #define valtovec(v)    ((vec_t)val_to_pointer(v,((uint64_t)0x0000FFFFFFFFFFFE)))
+#define valtoblk(v)    ((blk_t)val_to_pointer(v,((uint64_t)0x0000FFFFFFFFFFFE)))
 
 // Some constant
 #define valfalse      ((val_t){0xFFF8FFFFFFFFFF00})
@@ -136,6 +151,9 @@ static inline   void *val_topointer(val_t v, uint64_t mask) { return (void *)((u
 #define valempty      ((val_t){0xFFF80FFFFFFFFFB0})
 #define valmarked     ((val_t){0xFFF80FFFFFFFFFE1})
 #define valnilpointer ((val_t){0xFFFD000000000000})
+
+#define valconst(x)   ((val_t){0xFFF8000000000000 | (uint32_t)(x)})
+#define valisconst(x) ((val(x).v & (uint64_t)0xFFFFFFFF00000000) == ((uint64_y)0xFFF800000000000))
 
 #define valnilstr   val_nilstr()
 static inline val_t val_nilstr() {static char *s=""; return val_fromstr(s);}

@@ -5,10 +5,10 @@
 #define false ((_Bool)0)
 #define bool _Bool
 
-int main(int argc, char *argv[])
+tstsuite("Basic val tests")
 {
-   val_t x;
-   tstrun() {
+     val_t x;
+
      tstcase("Check Type") {
        x = val(12);
        tstcheck(valisinteger(x));
@@ -23,8 +23,7 @@ int main(int argc, char *argv[])
        tstcheck(!valisinteger(3.5));
        tstcheck(valisdouble(3.5));
      }
-  
-  
+    
      tstcase("Check conversion") {
        float x_f = valtofloat(x);
   
@@ -69,6 +68,17 @@ int main(int argc, char *argv[])
     
        x = val("Hello!");
        tstcheck(strcmp("Hello!",valtostring(x)) == 0);
-     }
-   } 
+    }
+
+    tstcase("Constants") {
+      x = valconst(23);
+      val_t y = val(23);
+
+      tstcheck(!valeq(x,y));
+      tstcheck(valtointeger(x) == valtointeger(y));
+      tstcheck(valtobool(x) == valtobool(y));
+      tstcheck(!valisinteger(x));
+      tstcheck(valisinteger(y));
+    }
+
 }

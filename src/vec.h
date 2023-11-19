@@ -5,6 +5,44 @@
 #ifndef VEC_VERSION
 #define VEC_VERSION 0x0004000B
 
+/* ## Index
+ *  ### Managing vectors
+ *    - vecnew()
+ *    - vecfree()
+ *    - vecclear()
+ *    - vecsize()
+ *    - veccount()
+ *    - vec()      Returns the array of values
+ * 
+ *  ### Array style
+ *    - vecset(vec, ndx, val)
+ *    - vecget(vec, ndx)
+ *    - vecins(vec,ndx,val)
+ *    - vecdel(vec,from,to)
+ * 
+ *  ### Stack style
+ *    - vecpush(vec, val)
+ *    - vectop(vec)
+ *    - vecdrop(vec)
+ *
+ *  ### Queue style
+ *    - vecenq(vec, val)
+ *    - vecdeq(vec)
+ *    - vecdrop(vec)
+ *    - vecfirst(vec)
+ *    - veclast(vec)
+ * 
+ *  ### List style
+ *    - vechead
+ *    - vectail
+ *    - veccur
+ *    - vecnext
+ *    - vecprev
+ *    - vecinsnext(vec,val)
+ *    - vecinsprev(vec,val)
+ *    - vecadd()
+*/
+
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -26,13 +64,18 @@
 #define VEC_ISMAP   ((uint8_t)0x05)
 #define VEC_ISNULL  ((uint8_t)0x7F)
 
-#define VECNONDX     0xFFFFFFFF
 #define VECTOPNDX    0xFFFFFFFE
 #define VECHEADNDX   0xFFFFFFFD
 #define VECTAILNDX   0xFFFFFFFC
 #define VECFIRSTNDX  0xFFFFFFFB
 #define VECLASTNDX   0xFFFFFFFA
 #define VECCURNDX    0xFFFFFFF9
+#define VECNEXTNDX   0xFFFFFFF8
+#define VECPREVNDX   0xFFFFFFF7
+#define VECCOUNTNDX  0xFFFFFFF4
+#define VECSIZENDX   0xFFFFFFF3
+#define VECNONDX     0xFFFFFFF2
+#define VECERRORNDX  0xFFFFFFF1
 #define VECMAXNDX    0xFFFFFFF0
 
 #define VEC_cnt(x1,x2,x3,x4,xN, ...) xN
@@ -86,15 +129,14 @@
  *
  */
 typedef struct vec_s {
-  val_t   *vec;  // Pointer to the array containing values
-  uint32_t sze;  // How many values the array can contain
-  uint32_t cnt;  // How many values are in the vector
-  uint32_t fst;  // Pointer to the first element
-  uint32_t lst;  // Pointer to the last  element
-  uint32_t cur;  // Pointer to the current element
-  uint16_t flg;  // Flags
-  uint8_t  typ;  // Type of structure
-  uint8_t  off;  // offset for extra elements
+     struct 
+     val_blk_s blk;
+      uint32_t fst;  // Pointer to the first element
+      uint32_t lst;  // Pointer to the last  element
+      uint32_t cur;  // Pointer to the current element
+      uint16_t flg;  // Flags
+      uint8_t  typ;  // Type of structure
+      uint8_t  off;  // offset for extra elements
 } *vec_t;
 
 /**
@@ -193,7 +235,7 @@ val_t *vec(val_t v);
  * Example usage:
  * @code
  *     val_t my_vector = vecnew();
- *     // Add some elements to my_vector...
+ *     // Add some elements to my_vector... 
  *     uint32_t count = veccount(my_vector); // Retrieve the count of elements in my_vector
  * @endcode
  *
@@ -269,8 +311,8 @@ uint32_t vecsize_2(val_t vv, uint32_t n);
  * @endcode
  */
 static inline uint32_t vecclear(val_t vv) { vec_t v; if (!valisvec(vv)) { errno=EINVAL; return  0; }\
-                                                     v = valtovec(vv); v->cnt=v->fst=v->lst=v->flg=v->cur=v->typ=0;\
-                                                     return v->sze;}
+                                                     v = valtovec(vv); v->blk.cnt=v->fst=v->lst=v->flg=v->cur=v->typ=0;\
+                                                     return v->blk.sze;}
 
 #define vectype(...) VEC_vrg(vectype_,__VA_ARGS__)
 #define vectype_1(v) vectype_2(v,-1)
@@ -301,6 +343,9 @@ int vectype_2(val_t vv,int type);
  * @endcode
  */
 #define vecisempty(v) (veccount(v) == 0)
+
+uint32_t vecindex(val_t vv,uint32_t ndx);
+
 
 /**
  * @fn uint32_t vecset(val_t v ,uint32_t i, val_t x)
@@ -437,9 +482,7 @@ int vec_gap_3(val_t v, uint32_t i, uint32_t l);
 #define vec_gap_2(v,i)    vec_gap_3(v,i, 1)
 
 #define vecins(v,i,x) vecins_(v,i,val(x))
-static inline uint32_t vecins_(val_t vv, uint32_t i, val_t x) {
-  vec_t v; return (vecmakegap(vv,i,1))? (((v = valtovec(vv))->vec[i] = x),v->sze) : VECNONDX; 
-}
+uint32_t vecins_(val_t vv, uint32_t i, val_t x);
 
 /**
  * @fn uint32_t vecpush(val_t v, val_t x)
@@ -485,7 +528,7 @@ uint32_t vecpush_(val_t vv, val_t x);
  *     val_t topValue = vectop(my_stack);  // Get the top value without popping it
  * @endcode
  */
-#define vectop(v)    vecget(v,VECNONDX)
+#define vectop(v)    vecget(v,VECTOPNDX)
 
 /**
  * @fn val_t vecpop(val_t v)
@@ -661,7 +704,7 @@ uint32_t vecsearch(val_t v, val_t x, val_t aux);
 uint32_t vecsort(val_t v, int (*cmp)(val_t a, val_t b, val_t aux), val_t aux);
 
 #ifndef NDEBUG
-  #define vecdbg(...) (fprintf(stderr,"INFO│  "),fprintf(stderr, __VA_ARGS__),fprintf(stderr," » %s:%d\n",__FILE__,__LINE__))
+  #define vecdbg(...) (fprintf(stderr,"      INFO|  "),fprintf(stderr, __VA_ARGS__),fprintf(stderr," [%s:%d]\n",__FILE__,__LINE__))
 #else
   #define vecdbg(...)
 #endif

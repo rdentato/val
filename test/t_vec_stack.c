@@ -5,16 +5,11 @@
 
 #define VEC_MAIN
 #include "vec.h"
-tsttags(large);
 
-int main(int argc, char *argv[])
+tstsuite("Stack tests",nolarge)
 {
-  val_t v=valnil;
-  val_t x=valnil;
-
-  tstsettags(argc,argv);
-
-  tstrun() {
+     val_t v=valnil;
+     val_t x=valnil;
 
      tstcase("Setting values as a stack") {
       tstassert(!valisnil((v = vecnew())));
@@ -113,8 +108,8 @@ int main(int argc, char *argv[])
       tstcheck(valisnil(x));
     }
 
-    tstgroup(tsttag(large)) {
-      tstcase("large stack") {
+    tstcase("large stack") {
+      tstskipif(tsttag(nolarge)) {
         tstassert(!valisnil((v = vecnew())));
         for (int k=1000; k< 1100; k++)
            vecpush(v,k);
@@ -129,7 +124,5 @@ int main(int argc, char *argv[])
       }
     }
 
-  }
-
-  if (!valisnil(v)) v=vecfree(v);
+    if (!valisnil(v)) v=vecfree(v);
 }

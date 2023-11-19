@@ -6,16 +6,10 @@
 #define VEC_MAIN
 #include "vec.h"
 
-tsttags(large);
-
-int main(int argc, char *argv[])
+tstsuite("Queue test cases",nolarge)
 {
-  val_t v=valnil;
-  val_t x=valnil;
-
-  tstsettags(argc,argv);
-
-  tstrun() {
+    val_t v=valnil;
+    val_t x= valnil;
 
     tstcase("Setting values as a queue") {
       tstcheck(!valisnil((v = vecnew())));
@@ -114,9 +108,9 @@ int main(int argc, char *argv[])
       tstcheck(valeq(vecdeq(v),100));
       tstcheck(veccount(v) == 2);
       vv = valtovec(v);
-      tstcheck(vv->fst == 1 && vv->cnt == 3);
+      tstcheck(vv->fst == 1 && vv->blk.cnt == 3);
       tstcheck(veccount(v,1) == 1);
-      tstcheck(vv->fst == 1 && vv->cnt == 2);
+      tstcheck(vv->fst == 1 && vv->blk.cnt == 2);
       tstcheck(valeq(vecdeq(v),200));
       
       tstcheck(veccount(v,7) == 7);
@@ -127,8 +121,8 @@ int main(int argc, char *argv[])
       tstcheck(veccount(v,7)==0 && errno == EINVAL);
     }
 
-    tstgroup(tsttag(large), "Large queue test disabled") {
-      tstcase("large queue") {
+    tstcase("large queue") {
+      tstskipif(tsttag(nolarge)) {
         tstassert(!valisnil((v = vecnew())));
         for (int k=0; k<100; k++) vecenq(v,1000+k);
         tstcheck(veccount(v) == 100);
@@ -137,7 +131,5 @@ int main(int argc, char *argv[])
         v = vecfree(v);
       }
     }
-  }
-
-  if (!valisnil(v)) v=vecfree(v);
+    if (!valisnil(v)) v=vecfree(v);
 }

@@ -3,16 +3,10 @@
 #define VEC_MAIN
 #include "vec.h"
 
-tsttags(large,medium)
+tstsuite("Array tests",nolarge) {
 
-int main(int argc, char *argv[])
-{
-  val_t v = valnil;
-  val_t x = valnil;
-
-  tstsettags(argc,argv);
-
-  tstrun() {
+    val_t v = valnil;
+    val_t x = valnil;
 
     tstcase("Create & Destroy vectors") {
       tstcheck(!valisnil((v = vecnew())));
@@ -22,12 +16,14 @@ int main(int argc, char *argv[])
 
     tstcase("Setting values as an array") {
       tstcheck(!valisnil((v = vecnew())));
-      tstcheck(vecset(v,2,43) == 2);
+      tstcheck(vecset(v,2,43) == 2);  // vecset will return the "slot indexx" were the value has been stored.
       tstcheck(veccount(v) == 3);
       tstcheck(vecset(v,1,32) == 1);
       tstcheck(veccount(v) <= vecsize(v));
       tstcheck(vecset(v,223,100) == 223);
-      tstcheck(veccount(v) <= vecsize(v));
+      tstcheck(vecsize(v) >= 223);
+      tstcheck(veccount(v) == 224);
+      tstcheck(veccount(v) < vecsize(v));
       tstcheck(vecset(v,12,"100") == 12);
       v = vecfree(v);
       tstcheck(vecset(v,1,32) == VECNONDX && errno == EINVAL);
@@ -121,8 +117,8 @@ int main(int argc, char *argv[])
       tstcheck(veccount(v,7)==0 && errno == EINVAL);
     }
 
-    tstgroup(tsttag(large), "Large array test disabled") {
-      tstcase("large array") {
+    tstcase("large array") {
+      tstskipif(tsttag(nolarge)) {
         tstassert(!valisnil((v = vecnew())));
         for (int k=0; k<100; k++) vecset(v,k,1000+k);
         tstcheck(veccount(v) == 100);
@@ -131,7 +127,7 @@ int main(int argc, char *argv[])
         v = vecfree(v);
       }
     }
-  }
-  if (valisvec(v)) v=vecfree(v);
-  tstcheck(valisnil(v));
+    if (valisvec(v)) v=vecfree(v);
+    tstcheck(valisnil(v));
+
 }

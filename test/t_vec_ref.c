@@ -6,16 +6,11 @@
 #define VEC_MAIN
 #include "vec.h"
 
-tsttags(large,medium);
+tst_suite("Check owning reference") {
 
-int main(int argc, char *argv[])
-{
-  val_t v = valnil;
-  val_t x = valnil;
+    val_t v = valnil;
+    val_t x = valnil;
 
-  tstsettags(argc,argv);
-
-  tstrun() {
     tstcase("Creating a ref") {
       tstcheck(!valisnil((v = vecnew())));
       tstcheck(vectype(v) == VEC_ISVEC);
@@ -30,7 +25,6 @@ int main(int argc, char *argv[])
       tstcheck(valisnil(x) && (errno == 0));
     }
 
-  }
-  if (valisvec(v)) v=vecfree(v);
-  tstcheck(valisnil(v));
+    if (valisvec(v)) v=vecfree(v);
+    tstcheck(valisnil(v));
 }
