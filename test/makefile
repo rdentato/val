@@ -1,41 +1,15 @@
-#  SPDX-Creator-Person: Remo Dentato (rdentato@gmail.com)
-#  SPDX-License-Identifier: MIT
+TESTDIR=val vec
 
-_EXE=.exe
-STATIC=-static
+all:
+	@echo "CD to the proper test directory to make tests"
 
-ifeq "$(COMSPEC)" ""
-_EXE=
-STATIC=
-endif
-
-CFLAGS=-O2 -Wall -I../src $(STATIC) -DDEBUG
-LIBS=
-
-TESTS_SRC=$(wildcard t_*.c)
-TESTS=$(TESTS_SRC:.c=)
-
-# implicit rules
-MAKEFLAGS += --no-builtin-rules
-
-# targets
-all: $(TESTS)
-
-SRCDIR=../src
-
-runtest: all
-	@./tstrun 
-
-#%.o: %.c 
-#	$(CC) $(CFLAGS) -c $< -o $@
-
-%: %.c 
-	$(CC) $(CFLAGS) $< -o $* $(LIBS)
-
-#.PRECIOUS: %.o
-
+runtest:
+	@for f in $(TESTDIR) ; do \
+	  cd $$f ; make runtest ; cd .. ;\
+	done
+	
 clean:
-	rm -f $(TESTS) $(TESTS:=.exe) $(TESTS:=.o) test.log
-
-cleanall: clean
-	make -C $(SRCDIR) clean
+	@for f in $(TESTDIR) ; do \
+	  cd $$f ; make clean ; cd .. ;\
+	done
+	
