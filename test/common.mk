@@ -9,7 +9,7 @@ _EXE=
 STATIC=
 endif
 
-CFLAGS=-O2 -Wall -I../../src -I.. $(STATIC) -DDEBUG
+CFLAGS=-g -Wall -I../../src -I.. $(STATIC) -DDEBUG
 LIBS=
 
 TESTS_SRC=$(wildcard t_*.c)
@@ -21,7 +21,7 @@ MAKEFLAGS += --no-builtin-rules
 # targets
 all: $(TESTS)
 
-SRCDIR=../src
+SRCDIR=../../src
 
 runtest: all
 	@../tstrun 

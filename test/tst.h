@@ -160,10 +160,10 @@ static inline char *tst_time(void)
 #define tstrun_(tst_, title_,...) \
   tst_tags(0,__VA_ARGS__); void tst__run(int n); \
   int main(int argc, char **argv) { \
-    tst_title = getenv("TSTOPTIONS"); \
-    tst_report_err = (short)tst_parsetags(1,(const char **)&tst_title); \
-    tst_report_err = (short)tst_parsetags(argc,(const char **)argv); \
+    char *tst_options=getenv("TSTOPTIONS"); \
     tst_title = title_; \
+    tst_report_err = (short)tst_parsetags(1,(const char **)&tst_options); \
+    tst_report_err = (short)tst_parsetags(argc,(const char **)argv); \
     if (CLOCKS_PER_SEC > ((clock_t)1000000) + tst_zero) tst_clock_unit = "n"; \
     else if(CLOCKS_PER_SEC > ((clock_t)1000) + tst_zero) tst_clock_unit = "u"; \
     else tst_clock_unit = "m"; \
@@ -200,7 +200,7 @@ static inline int tstskipped(void) {return (tst_result < 0);}
     if (tst_result == 0) { \
       fprintf(stderr," \"" __VA_ARGS__); fputc('"',stderr); \
       if (tst_abrt)  { \
-        fputs(tst_str_file_abr,stderr); tst_prt_results(tst_fail, tst_pass, tst_skip); fprintf(stderr," %s\n",tst_time()); \
+        fputc('\n',stderr); fputs(tst_str_file_abr,stderr); tst_prt_results(tst_fail, tst_pass, tst_skip); fprintf(stderr," %s\n",tst_time()); \
         exit(0);\
       } \
     } \

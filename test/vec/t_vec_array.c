@@ -16,17 +16,17 @@ tstsuite("Array tests",nolarge) {
 
     tstcase("Setting values as an array") {
       tstcheck(!valisnil((v = vecnew())));
-      tstcheck(vecset(v,2,43) == 2);  // vecset will return the "slot indexx" were the value has been stored.
+      tstcheck(valeq(vecset(v,2,43),43));  // vecset will return the "slot indexx" were the value has been stored.
       tstcheck(veccount(v) == 3);
-      tstcheck(vecset(v,1,32) == 1);
+      tstcheck(valeq(vecset(v,1,32),32));
       tstcheck(veccount(v) <= vecsize(v));
-      tstcheck(vecset(v,223,100) == 223);
+      tstcheck(valeq(vecset(v,223,100),100));
       tstcheck(vecsize(v) >= 223);
       tstcheck(veccount(v) == 224);
       tstcheck(veccount(v) < vecsize(v));
-      tstcheck(vecset(v,12,"100") == 12);
+      tstcheck(strcmp(valtostring(vecset(v,12,"100")),"100") == 0);
       v = vecfree(v);
-      tstcheck(vecset(v,1,32) == VECNONDX && errno == EINVAL);
+      tstcheck(valeq(vecset(v,1,32), valerror) && errno == EINVAL);
     }
 
     tstcase("Getting value from an array") {
@@ -117,12 +117,66 @@ tstsuite("Array tests",nolarge) {
       tstcheck(veccount(v,7)==0 && errno == EINVAL);
     }
 
+    tstcase("Set will zero previusly unused memory") {
+      tstassert(!valisnil((v = vecnew())));
+      tstcheck(veccount(v) == 0);
+
+      tstcheck(valisnil(vecget(v,0)));
+
+      tstcheck(valeq(vecset(v,2,6.5),6.5));
+      tstcheck(veccount(v) == 3);
+
+      tstcheck(valisdouble(vecget(v,0)));
+      tstcheck(valeq(vecget(v,0),0.0));
+
+      tstcheck(valisdouble(vecget(v,1)));
+      tstcheck(valeq(vecget(v,1),0.0));
+
+      v = vecfree(v);      
+    }
+
+    tstcase("makegap will zero the created gap") {
+      tstassert(!valisnil((v = vecnew())));
+      tstcheck(veccount(v) == 0);
+
+      tstcheck(valeq(vecset(v,0,100),100));
+      tstcheck(valeq(vecset(v,1,101),101));
+      tstcheck(valeq(vecset(v,2,102),102));
+      tstcheck(valeq(vecset(v,3,103),103));
+      tstcheck(veccount(v) == 4);
+
+      tstcheck(vecmakegap(v,1,2));
+      tstcheck(veccount(v) == 6, "Expected 6 got: %d",veccount(v));
+
+      tstcheck(valeq(vecget(v,3),101));
+      tstcheck(valeq(vecget(v,4),102));
+      tstcheck(valeq(vecget(v,5),103));
+
+      tstcheck(valisdouble(vecget(v,1)));
+      tstcheck(valeq(vecget(v,1),0.0));
+
+      tstcheck(valisdouble(vecget(v,2)));
+      tstcheck(valeq(vecget(v,2),0.0));
+
+      tstcheck(vecmakegap(v,10)); // extend the vec with 10 elements
+      tstcheck(veccount(v) == 16);
+
+      tstcheck(valisdouble(veclast(v)));
+      tstcheck(valeq(veclast(v),0.0));
+      tstcheck(vecindex(v,VECLASTNDX) == veccount(v)-1);
+      tstcheck(vecindex(v,VECLASTNDX,-2) == veccount(v)-3);
+
+      tstcheck(vecindex(v,VECLASTNDX,-30) == VECERRORNDX);
+
+      v = vecfree(v);      
+    }
+
     tstcase("large array") {
       tstskipif(tsttag(nolarge)) {
         tstassert(!valisnil((v = vecnew())));
-        for (int k=0; k<100; k++) vecset(v,k,1000+k);
+        for (int k=0; k<100 && !errno ; k++) vecset(v,k,1000+k);
         tstcheck(veccount(v) == 100);
-        for (int k=0; k<100; k++) 
+        for (int k=0; k<veccount(v); k++) 
           tstcheck(valeq((x=vecget(v,k)),1000+k)); 
         v = vecfree(v);
       }

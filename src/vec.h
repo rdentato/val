@@ -51,7 +51,6 @@
 #include <stddef.h>
 #include <inttypes.h>
 #include <assert.h>
-#include <errno.h>
 
 #include "val.h"
 
@@ -83,6 +82,9 @@
 #define VEC_join(x ,y)   x ## y
 #define VEC_cat(x, y)    VEC_join(x, y)
 #define VEC_vrg(f, ...)  VEC_cat(f, VEC_n(__VA_ARGS__))(__VA_ARGS__)
+#define VEC_VRG(f, ...)  VEC_cat(f, VEC_n(__VA_ARGS__))(__VA_ARGS__)
+
+#define val_torealvec(vv) ((vec_t)val_to_pointer(vv,(uint64_t)0x0000FFFFFFFFFFFE))
 
 /**
  * @struct vec_s
@@ -123,24 +125,25 @@
  *
  * Example usage:
  * @code
- *     vec_t my_vector = vecnew(); // Utilizing the vecnew function as described previously
+ *     val_t my_vector = vecnew(); // Utilizing the vecnew function as described previously
  *     // Perform operations using my_vector...
  * @endcode
  *
  */
 typedef struct vec_s {
-     struct 
-     val_blk_s blk;
+        val_t *vec;
+      uint32_t sze;
+      uint32_t cnt;
       uint32_t fst;  // Pointer to the first element
       uint32_t lst;  // Pointer to the last  element
       uint32_t cur;  // Pointer to the current element
       uint16_t flg;  // Flags
-      uint8_t  typ;  // Type of structure
-      uint8_t  off;  // offset for extra elements
+       uint8_t typ;  // Type of structure
+       uint8_t off;  // offset for extra elements
 } *vec_t;
 
 /**
- * @fn vec_t vecnew()
+ * @fn val_t vecnew()
  * 
  * @brief Create and initialize a new vector.
  *
@@ -148,27 +151,23 @@ typedef struct vec_s {
  * It initializes any necessary properties of the vector, such as its size, 
  * capacity, and any internal data structures used for storing elements of type `val_t`.
  *
- * @return A new vector of type `vec_t`, initialized and ready for use.
+ * @return A `val_t` value holdint the `vec_t` value for a new vector, initialized and ready for use.
  *         If the vector creation fails (for instance, due to memory allocation issues), 
- *         the function should return NULL and errno is set to ENOMEM.
+ *         the function should return valnil and errno is set to ENOMEM.
  *
  * Example usage:
  * @code
- *     vec_t my_vector = vecnew();
- *     if (!my_vector) {
+ *     val_t my_vector = vecnew();
+ *     if (!valisnil(my_vector)) {
  *         // Handle error (e.g., due to failed memory allocation)
  *     }
  * @endcode
  *
  * Note: Users should check the return value to ensure that the vector was 
  *       created successfully before attempting to use it. This might involve 
- *       checking that the returned value is not NULL and errno is ENOMEM.
+ *       checking that the returned value is not valnil and errno is not ENOMEM.
  */
-static inline val_t vecnew() {
-  vec_t v = calloc(1,sizeof(struct vec_s));
-  if (v == NULL) { errno = ENOMEM; return valnil; }
-  return val(v);
-}
+val_t vecnew();
 
 /**
  * @fn val_t vecfree(val_t v)
@@ -193,10 +192,11 @@ static inline val_t vecnew() {
  * @endcode
  */
 val_t vecfree(val_t vv);
+val_t vecrefree(val_t vv);
 
-int valisvecref(val_t v);
-int vecisowned(val_t vv);
-val_t vecown(val_t vv);
+#define vecsetfree(...) VEC_vrg(vecsetfree_,__VA_ARGS__)
+#define vecsetfree_2(v,i) vecsetfree_3(v,i,0)
+val_t vecsetfree_3(val_t v, uint32_t i, int32_t delta);
 
 /**
  * @fn val_t *vec(val_t v)
@@ -284,39 +284,27 @@ uint32_t veccount_2(val_t v, uint32_t n);
 #define vecsize_1(v) vecsize_2(v,VECNONDX)
 uint32_t vecsize_2(val_t vv, uint32_t n);
 
-/**
- * @fn uint32_t vecclear(val_t v)
- * 
- * @brief Clears the vector's elements and returns its size.
- *
- * The `vecclear` function resets the element counter of the given vector to zero, 
- * effectively removing all its elements without freeing up any memory. This 
- * allows for efficient reuse of the vector without incurring additional memory 
- * allocation costs. The function then returns the size (capacity) of the vector, 
- * which represents the total number of elements it can hold without needing a resize.
- *
- * @param v The vector of type `val_t` that is to be cleared.
- *          Ensure that `v` is a valid and initialized vector.
- *
- * @return The capacity of the vector. This represents the maximum number of 
- *         elements the vector can hold without needing a resize.
- *
- * Example usage:
- * @code
- *     val_t my_vector = vecnew();
- *     // ... (some operations on my_vector)
- *     
- *     uint32_t capacity_after_clear = vecclear(my_vector);
- *     printf("Vector cleared. Current capacity: %u\n", capacity_after_clear);
- * @endcode
- */
-static inline uint32_t vecclear(val_t vv) { vec_t v; if (!valisvec(vv)) { errno=EINVAL; return  0; }\
-                                                     v = valtovec(vv); v->blk.cnt=v->fst=v->lst=v->flg=v->cur=v->typ=0;\
-                                                     return v->blk.sze;}
-
 #define vectype(...) VEC_vrg(vectype_,__VA_ARGS__)
 #define vectype_1(v) vectype_2(v,-1)
 int vectype_2(val_t vv,int type);
+
+/**
+ * @fn int vecisqueue(val_t v)
+ * 
+ * @brief Checks if the given vector {@code v} represents a queue.
+ * @param v The vector of type {@code val_t} to be checked for queue properties.
+ * @return Returns 1 if it is a queue, 0 otherwise.
+ */
+#define vecisqueue(v) (vectype(v) == VEC_ISQUEUE)
+
+/**
+ * @fn int vecisstack(val_t v)
+ * 
+ * @brief Checks if the given vector {@code v} represents a stack.
+ * @param v The vector of type {@code val_t} to be checked for stack properties.
+ * @return Returns 1 if it is a stack, 0 otherwise.
+ */
+#define vecisstack(v) (vectype(v) == VEC_ISSTACK)
 
 /**
  *  @fn int vecisempty(val_t v)
@@ -344,11 +332,14 @@ int vectype_2(val_t vv,int type);
  */
 #define vecisempty(v) (veccount(v) == 0)
 
-uint32_t vecindex(val_t vv,uint32_t ndx);
+#define vecindex(...) VEC_vrg(vecindex_,__VA_ARGS__)
+#define vecindex_1(v)   vecindex_3(v,0,0)
+#define vecindex_2(v,n) vecindex_3(v,n,0)
+uint32_t vecindex_3(val_t vv, uint32_t ndx, int32_t delta);
 
 
 /**
- * @fn uint32_t vecset(val_t v ,uint32_t i, val_t x)
+ * @fn val_t vecset(val_t v ,uint32_t i, val_t x)
  * 
  * @brief Set a value at the specified index in the vector, possibly adjusting its size.
  *
@@ -365,7 +356,7 @@ uint32_t vecindex(val_t vv,uint32_t ndx);
  * @param x The value to be set at index `i` in vector `v`. It can be a base
  *          type (e.g. an integer) or a val_t type.
  *
- * @return The index at which the value was set or `VECNONDX` in case of failure.
+ * @return The value that has been set or `valerror` in case of failure.
  *
  * @note The function `makeroom` is called to ensure that there is enough room 
  *       in `v` to set the value `x` at index `i`. 
@@ -379,11 +370,11 @@ uint32_t vecindex(val_t vv,uint32_t ndx);
  *     uint32_t new_index = vecset(my_vector, index+1, 42);
  * @endcode
  */
-#define  vecset(v,i,x)  vecset_(v,i,val(x))
-uint32_t vecset_(val_t v, uint32_t i, val_t x);
+#define  vecset(v,i,x)     vecset_(v,i,val(x))
+val_t vecset_(val_t v, uint32_t i, val_t x);
 
 /**
- * @fn uint32_t vecadd(val_t v, val_t x)
+ * @fn val_t vecadd(val_t v, val_t x)
  * 
  * @brief Append an element to the end of the vector.
  *
@@ -407,10 +398,10 @@ uint32_t vecset_(val_t v, uint32_t i, val_t x);
  *     uint32_t new_count = vecadd(my_vector, my_value); // Append my_value to my_vector
  * @endcode
  */
-#define vecadd(v,x) vecset(v,VECNONDX,x)
+#define vecadd(v,x)    vecset_(v,VECNONDX,val(x))
 
 /**
- * @fn val_t vecget(val_t v , uint32_t i)
+ * @fn val_t vecget(val_t v , uint32_t i, int32_t delta)
  * 
  * @brief Retrieve an element from the vector at the specified index.
  *
@@ -425,6 +416,9 @@ uint32_t vecset_(val_t v, uint32_t i, val_t x);
  *          ensuring that only non-negative integer values are valid.
  *          If it is unspecified (`vecget(v)`),  the last element of the
  *          vector will be returned.
+ * 
+ * @param delta A displacement (+/-) with respect to the desired index. If the
+ *          resulting index is out of bounds, `vecget()` will return `valnil`
  *
  * @return The value of type `val_t` stored at index `i` in the vector `v`,
  *         or `valnil` upon error.
@@ -437,7 +431,10 @@ uint32_t vecset_(val_t v, uint32_t i, val_t x);
  * @endcode * @
  *
  */
-val_t vecget(val_t v, uint32_t i);
+#define vecget(...) VEC_vrg(vecget_,__VA_ARGS__)
+#define vecget_1(v) vecget_3(v,0,0)
+#define vecget_2(v,n) vecget_3(v,n,0)
+val_t vecget_3(val_t v, uint32_t i, int32_t delta);
 
 /**
  * @fn val_t vecdel(val_t v, uint32_t i [, uint32_t j] )
@@ -460,8 +457,8 @@ val_t vecget(val_t v, uint32_t i);
  *          Ensure that `j` is within the bounds of the vector's current count and 
  *          that `j >= i`.
  *
- * @return Returns the value of the last deleted element of type `val_t` or `valnil`
- *         if an error occured.
+ * @return Returns the number of remaining elements in the vector or `VECERRORNDX`
+ *         upon error.
  *
  * Example usage:
  * @code
@@ -471,21 +468,21 @@ val_t vecget(val_t v, uint32_t i);
  *     val_t single_deleted = vecdel(my_vector, 3);  // Delete only the element at index 3
  * @endcode
  */
-val_t vecdel_3(val_t v, uint32_t i, uint32_t j);
 #define vecdel(...) VEC_vrg(vecdel_,__VA_ARGS__)
 #define vecdel_2(v,i) vecdel_3(v,i,VECNONDX)
+uint32_t vecdel_3(val_t v, uint32_t i, uint32_t j);
 
 
-int vec_gap_3(val_t v, uint32_t i, uint32_t l);
 #define vecmakegap(...)   VEC_vrg(vec_gap_,__VA_ARGS__)
-#define vec_gap_1(v)      vec_gap_3(v, VEC_NONDX, VEC_NONDX)
-#define vec_gap_2(v,i)    vec_gap_3(v,i, 1)
+#define vec_gap_1(v)      vec_gap_3(v, VECNONDX, VECNONDX)
+#define vec_gap_2(v,l)    vec_gap_3(v,VECNONDX, l)
+int vec_gap_3(val_t v, uint32_t i, uint32_t l);
 
-#define vecins(v,i,x) vecins_(v,i,val(x))
+#define vecins(v,i,x)    vecins_(v,i,val(x))
 uint32_t vecins_(val_t vv, uint32_t i, val_t x);
 
 /**
- * @fn uint32_t vecpush(val_t v, val_t x)
+ * @fn val_t vecpush(val_t v, val_t x)
  * 
  * @brief Push a value onto the stack.
  *
@@ -505,11 +502,11 @@ uint32_t vecins_(val_t vv, uint32_t i, val_t x);
  *     vecpush(my_stack, "Total");  // Push another value onto my_stack
  * @endcode
  */
-#define vecpush(v,x)   vecpush_(v,val(x))
-uint32_t vecpush_(val_t vv, val_t x);
+#define vecpush(v,x) vecpush_(v,val(x))
+val_t vecpush_(val_t vv, val_t x);
 
 /**
- * @fn val_t vectop(val_t v)
+ * @fn val_t vectop(val_t v, int32_t delta)
  * 
  * @brief Retrieve the top value of the stack without removing it.
  *
@@ -528,29 +525,11 @@ uint32_t vecpush_(val_t vv, val_t x);
  *     val_t topValue = vectop(my_stack);  // Get the top value without popping it
  * @endcode
  */
-#define vectop(v)    vecget(v,VECTOPNDX)
+#define vectop(...)  VEC_vrg(vectop_,__VA_ARGS__)
+#define vectop_1(v)   vecget_3(v,VECTOPNDX,0)
+#define vectop_2(v,d) vecget_3(v,VECTOPNDX,d)
 
-/**
- * @fn val_t vecpop(val_t v)
- * 
- * @brief Pop the top value from the stack.
- *
- * The `vecpop` function is employed to retrieve and remove the topmost value 
- * from the vector, treating it as a stack.
- *
- * @param v The stack of type `val_t` from which the top value is to be popped.
- *
- * @return The topmost value of type `val_t` that was in the stack. If the stack 
- *         was empty, the function returns `valnil`.
- *
- * Example usage:
- * @code
- *     val_t my_stack = vecnew();
- *     // ... (push some elements onto my_stack)
- *     val_t poppedValue = vecpop(my_stack);  // Pop the top value from my_stack
- * @endcode
- */
-#define vecpop(v)    vecdrop(v)
+#define vecpop(...) vecdrop(__VA_ARGS__)
 
 /**
  * @fn val_t vecdrop(val_t v [, uint32_t n])
@@ -572,8 +551,8 @@ uint32_t vecpush_(val_t vv, val_t x);
  *          should be emptied or an appropriate error handling mechanism should be 
  *          in place. If `n` is not specified, it defaults to 1.
  *
- * @return Returns the value of the last dropped element of type `val_t`. If an error 
- *         occurs or no elements are dropped, the function returns `vecnil`.
+ * @return Returns the number of remaining elements in the vector or `VECERRORNDX`
+ *         upon error.
  *
  * Example usage:
  * @code
@@ -584,10 +563,10 @@ uint32_t vecpush_(val_t vv, val_t x);
  */
 #define vecdrop(...) VEC_vrg(vecdrop_,__VA_ARGS__)
 #define vecdrop_1(v) vecdrop_2(v,1)
-val_t vecdrop_2(val_t v, uint32_t n);
+uint32_t vecdrop_2(val_t v, uint32_t n);
 
 /**
- * @fn uint32_t vecenq(val_t v, val_t x);
+ * @fn val_t vecenq(val_t v, val_t x);
  * @brief Enqueue a value onto the queue.
  *
  * The `vecenq` function inserts a value at the end of the vector, 
@@ -607,24 +586,24 @@ val_t vecdrop_2(val_t v, uint32_t n);
  * @endcode
  */
 #define vecenq(v,x) vecenq_(v,val(x))
-uint32_t vecenq_(val_t v, val_t x);
+val_t vecenq_(val_t v, val_t x);
 
 /**
- * @fn val_t vecdeq(val_t v [, uint32_t n])
+ * @fn uint32_t vecdeq(val_t v [, uint32_t n])
  * 
  * @brief Dequeue multiple values from the front of the queue.
  *
- * The `vecdeq` function retrieves and removes `n` values from the front of the 
+ * The `vecdeq` function removes the next `n` values from the front of the 
  * `val_t` data structure, treating it as a queue. After dequeuing the specified 
- * number of values, it returns the last value that was dequeued.
+ * number of values, it returns the number of remaining elements in the queue.
  *
  * @param v The queue of type `val_t` from which the values are to be dequeued.
  *
  * @param n The number of values to dequeue from the front of the queue. If `n` 
  *          is not specified, it defaults to 1.
  *
- * @return The last value of type `val_t` that was dequeued. If the queue becomes 
- *         empty during or after the operation, the function returns `valnil`.
+ * @return The number of remaining elemnets in the queue. If an error occurs, 
+ *         returns `0` and sets `errno`. 
  *
  * @note You can eliminate the last inserted elements in the queue using
  *       the `vecdrop()` function.
@@ -634,21 +613,24 @@ uint32_t vecenq_(val_t v, val_t x);
  *     val_t my_queue = vecnew();
  *     // ... (enqueue some elements onto my_queue)
  *     vecenq(my_queue, 100);
- *     vecwnq(my_queue, 200);
- *     vecwnq(my_queue, 300);
- *     val_t x = vecdeq(my_queue, 2);  // Dequeue the first 2 values from my_queue
- *                                        x will be 200 and only one element will be
- *                                        left in the queue.
+ *     vecenq(my_queue, 200);
+ *     vecenq(my_queue, 300);
+ *     val_t x = vecfirst(my_queue);  // x will be 100;
+ *     vecdeq(my_queue);              // Dequeue the first 2 values from my_queue
+ *     x = vecfirst(my_queue)         // x will be 300 
  * @endcode
  */
 #define vecdeq(...) VEC_vrg(vecdeq_,__VA_ARGS__)
 #define vecdeq_1(v) vecdeq_2(v,1)
-val_t vecdeq_2(val_t v, uint32_t n);
+uint32_t vecdeq_2(val_t v, uint32_t n);
+
+#define vechead(vv) vecget(vv,VECHEADNDX)
+#define vectail(vv) vecget(vv,VECTAILNDX)
 
 /**
- * @fn val_t vechead(val_t v)
+ * @fn val_t veclast(val_t v,int32_t delta)
  * 
- * @brief Retrieve the first value of the queue without removing it.
+ * @brief Retrieve the last inserted value in the queue without removing it.
  *
  * The `vechead` function gives insight into the first value of the queue 
  * without actually modifying the queue.
@@ -656,22 +638,27 @@ val_t vecdeq_2(val_t v, uint32_t n);
  * @param v The queue of type `val_t` whose first value is to be retrieved.
  *          Ensure that `v` is a valid and initialized queue.
  *
- * @return The first value of type `val_t` in the queue. If the queue is 
- *         empty, the function returns `valnil` or another suitable error value.
+ * @param delta A displacement to peek the values in the queue.
+ *          If the resulting index is out of bounds, it will return `valnil`
+ *
+ * @return The last inserted value of type `val_t` in the queue. If the queue is 
+ *         empty, the function returns `valnil`.
  *
  * Example usage:
  * @code
  *     val_t my_queue = vecnew();
  *     // ... (enqueue some elements onto my_queue)
- *     val_t firstValue = vechead(my_queue);  // Get the first value without dequeuing it
+ *     val_t firstValue = veclast(my_queue);  // Get the last value without dequeuing it
  * @endcode
  */
-val_t vechead(val_t v);
+#define veclast(...) VEC_vrg(veclast_,__VA_ARGS__)
+#define veclast_1(v)   vecget_3(v,VECLASTNDX,0)
+#define veclast_2(v,d) vecget_3(v,VECLASTNDX,d)
 
 /**
- * @fn val_t vectail(val_t v)
+ * @fn val_t vecfirst(val_t v,int32_t delta)
  * 
- * @brief Retrieve the first value of the queue without removing it.
+ * @brief Retrieve the first value in the queue without removing it.
  *
  * The `vectail` function gives insight into the first value of the queue 
  * without actually modifying the queue.
@@ -680,28 +667,40 @@ val_t vechead(val_t v);
  *          Ensure that `v` is a valid and initialized queue.
  *
  * @return The first value of type `val_t` in the queue. If the queue is 
- *         empty, the function returns `valnil` or another suitable error value.
+ *         empty, the function returns `valnil`.
  *
  * Example usage:
  * @code
  *     val_t my_queue = vecnew();
  *     // ... (enqueue some elements onto my_queue)
- *     val_t lastValue = vectail(my_queue);  // Get the last inserted value
+ *     val_t firstValue = vecfirst(my_queue);  // Get the first inserted value
  * @endcode
  */
-val_t vectail(val_t v);
-
-uint32_t vecfirst(val_t v);
-uint32_t veclast(val_t v);
-uint32_t vecnext(val_t v);
-uint32_t vecprev(val_t v);
-
-#define veccur(...) VEC_vrg(vec_cur_,__VA_ARGS__)
-#define vec_cur_1(v) vec_cur_2(v,VECNONDX)
-uint32_t vec_cur_2(val_t v, uint32_t i);
+#define vecfirst(...) VEC_vrg(vecfirst_,__VA_ARGS__)
+#define vecfirst_1(v)   vecget_3(v,VECFIRSTNDX,0)
+#define vecfirst_2(v,d) vecget_3(v,VECFIRSTNDX,d)
 
 uint32_t vecsearch(val_t v, val_t x, val_t aux);
 uint32_t vecsort(val_t v, int (*cmp)(val_t a, val_t b, val_t aux), val_t aux);
+
+
+#define vecown(v) vecown_(&(v))
+val_t vecown_(val_t *vp);
+
+val_t vecdisown_1_(val_t *vp)
+val_t vecdisown_2(val_t v, uint32_t i, int32_t delta)
+
+#define vecdisown_1(v) vecdisown_1_(&(v))
+
+val_t vecref(val_t v);
+
+#define vecunref(...) VEC_vrg(vecunref_,__VA_ARGS__)
+val_t vecunref_1(val_t v);
+val_t vecunref_2(val_t v,uint32_t i);
+
+#define valisref(x)       ((val(x).v & (VAL_VEC_MASK | 1)) == (VAL_VEC_MASK | 1))
+
+
 
 #ifndef NDEBUG
   #define vecdbg(...) (fprintf(stderr,"      INFO|  "),fprintf(stderr, __VA_ARGS__),fprintf(stderr," [%s:%d]\n",__FILE__,__LINE__))

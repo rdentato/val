@@ -13,15 +13,15 @@ tstsuite("Stack tests",nolarge)
 
      tstcase("Setting values as a stack") {
       tstassert(!valisnil((v = vecnew())));
-      tstcheck(vecpush(v,100) == 0);
+      tstcheck(valtointeger(vecpush(v,100)) == 100);
       tstcheck(veccount(v) == 1);
-      tstcheck(vecpush(v,200) == 1);
+      tstcheck(valtointeger(vecpush(v,200)) == 200);
       tstcheck(veccount(v) == 2);
-      tstcheck(vecpush(v,300) == 2);
+      tstcheck(valtointeger(vecpush(v,300)) == 300);
       tstcheck(veccount(v) == 3);
       tstcheck(valeq(vectop(v),300));
       v = vecfree(v);
-      tstcheck(vecpush(v,400) == VECNONDX && errno == EINVAL);
+      tstcheck(valeq(vecpush(v,400),valerror) && errno == EINVAL);
     }
 
     tstcase("Getting value from a stack") {
@@ -30,28 +30,43 @@ tstsuite("Stack tests",nolarge)
       vecpush(v,200);
       vecpush(v,300);
       tstcheck(!vecisempty(v));
-      tstcheck(valeq(vecpop(v),300));
-      tstcheck(valeq(vecpop(v),200));
-      tstcheck(valeq(vecpop(v),100));
-      tstcheck(vecisempty(v));
-      tstcheck(valisnil(vecpop(v)));
-      v = vecfree(v);
-      tstcheck(vecisempty(v));
-      tstcheck(valisnil(vecpop(v)));
-    }
-
-    tstcase("Getting value from a stack") {
-      tstassert(!valisnil((v = vecnew())));
-      vecpush(v,100);
-      vecpush(v,200);
-      vecpush(v,300);
-      tstcheck(veccount(v) == 3);
-      tstcheck(!vecisempty(v));
-      vecclear(v);
+      tstcheck(valeq(vectop(v),300));
+      tstcheck(vecpop(v) == 2);
+      tstcheck(valeq(vectop(v),200));
+      tstcheck(vecpop(v) == 1);
+      tstcheck(valeq(vectop(v),100));
+      tstcheck(vecpop(v) == 0);
       tstcheck(vecisempty(v));
       tstcheck(valisnil(vectop(v)));
       v = vecfree(v);
       tstcheck(vecisempty(v));
+      tstcheck(valisnil(vectop(v)));
+    }
+
+    tstcase("Peeking values from a stack") {
+      tstassert(!valisnil((v = vecnew())));
+      vecpush(v,100);
+      vecpush(v,200);
+      vecpush(v,300);
+      tstcheck(veccount(v) == 3);
+      tstcheck(!vecisempty(v));
+      tstcheck(valeq(vectop(v),300));
+      tstcheck(valeq(vectop(v,-1),200));
+      tstcheck(valeq(vectop(v,1),200));
+      tstcheck(valeq(vectop(v,-2),100));
+      tstcheck(valeq(vectop(v,2),100));
+
+      tstcheck(valisnil(vectop(v,-3)));
+      tstcheck(valisnil(vectop(v,3)));
+
+      tstcheck(valisnil(vectop(v,-332)));
+      tstcheck(valisnil(vectop(v,332)));
+
+      v = vecfree(v);
+      tstcheck(vecisempty(v));
+      tstcheck(valisnil(vectop(v)));
+      tstcheck(valisnil(vectop(v,-1)));
+      tstcheck(valisnil(vectop(v,-2)));
     }
 
     tstcase("Deleting elements from the top (single)") {
@@ -60,20 +75,18 @@ tstsuite("Stack tests",nolarge)
       vecpush(v,200);
       vecpush(v,300);
       tstcheck(veccount(v) == 3);
-      x = vecpop(v);
-      tstcheck(veccount(v) == 2);
+      x = vectop(v);
       tstcheck(valeq(x,300));
-      x = vecpop(v);
-      tstcheck(veccount(v) == 1);
+      tstcheck(vecpop(v) == 2);
+      tstcheck(veccount(v) == 2);
+      x = vectop(v);
       tstcheck(valeq(x,200));
-      vecclear(v);
-      tstcheck(vecisempty(v));
-      tstcheck(valisnil(vectop(v)));
-      x = vecpop(v);
-      tstcheck(valisnil(x));
+      tstcheck(vecpop(v) == 1);
+      tstcheck(veccount(v) == 1);
+
       v = vecfree(v);
       tstcheck(vecisempty(v));
-      x = vecpop(v);
+      x = vectop(v);
       tstcheck(valisnil(x));
     }
     
@@ -83,27 +96,29 @@ tstsuite("Stack tests",nolarge)
       vecpush(v,200);
       vecpush(v,300);
       tstcheck(veccount(v) == 3);
-      x = vecdrop(v,2);
+      vecpop(v);
+      x = vectop(v);
+      vecpop(v);
       tstcheck(veccount(v) == 1);
       tstcheck(valeq(x,200));
   
-      x = vecdrop(v,2);
+      x = vectop(v);
+      vecpop(v);
       tstcheck(veccount(v) == 0);
       tstcheck(valeq(x,100));
-
-      x = vecdrop(v,2);
+      vecpop(v,2);
+      x = vectop(v);
       tstcheck(veccount(v) == 0);
       tstcheck(valisnil(x));
 
       // Drop from an empty stack
-      x = vecdrop(v,2);
+      vecpop(v,2);
       tstcheck(veccount(v) == 0);
-      tstcheck(valisnil(x));
 
       v = vecfree(v);
 
       // Drop from an freed stack
-      x = vecdrop(v,2);
+      tstcheck(vecpop(v,2) == 0 && errno != 0);
       tstcheck(veccount(v) == 0);
       tstcheck(valisnil(x));
     }
@@ -111,13 +126,14 @@ tstsuite("Stack tests",nolarge)
     tstcase("large stack") {
       tstskipif(tsttag(nolarge)) {
         tstassert(!valisnil((v = vecnew())));
-        for (int k=1000; k< 1100; k++)
-           vecpush(v,k);
+        for (int k=1000; k< 1100 && !errno; k++) vecpush(v,k);
         tstcheck(!vecisempty(v));
         tstcheck(veccount(v) == 100);
-  
-        for (int k=1099; k>= 1000; k--)
-           tstcheck(valeq((x=vecpop(v)),k), "expected %d got %d",k,(int)valtointeger(x));
+
+        for (int k=1099; !vecisempty(v); k--) {
+           tstcheck(valeq((x=vectop(v)),k), "expected %d got %d",k,(int)valtointeger(x));
+           vecpop(v);
+        }
         tstcheck(vecisempty(v));
   
         v = vecfree(v);
