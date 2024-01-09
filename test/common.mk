@@ -9,8 +9,9 @@ _EXE=
 STATIC=
 endif
 
-CFLAGS=-g -Wall -I../../src -I.. $(STATIC) -DDEBUG
-LIBS=
+SRCDIR=../../src
+
+CFLAGS=-g -DDEBUG -Wall -I$(SRCDIR) -I.. $(STATIC)
 
 TESTS_SRC=$(wildcard t_*.c)
 TESTS=$(TESTS_SRC:.c=)
@@ -19,18 +20,19 @@ TESTS=$(TESTS_SRC:.c=)
 MAKEFLAGS += --no-builtin-rules
 
 # targets
-all: $(TESTS)
-
-SRCDIR=../../src
+all: objs $(TESTS)
 
 runtest: all
 	@../tstrun 
+
+objs:
+	cd $(SRCDIR) ; make
 
 #%.o: %.c 
 #	$(CC) $(CFLAGS) -c $< -o $@
 
 %: %.c 
-	$(CC) $(CFLAGS) $< -o $* $(LIBS)
+	$(CC) $(CFLAGS) $< $(OBJ) -o $*
 
 #.PRECIOUS: %.o
 

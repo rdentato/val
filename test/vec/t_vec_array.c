@@ -1,6 +1,4 @@
 #include "tst.h"
-
-#define VEC_MAIN
 #include "vec.h"
 
 tstsuite("Array tests",nolarge) {

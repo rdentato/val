@@ -1,2 +1,2 @@
-OBJ=$(SRCDIR)/vec.o
+OBJ=$(SRCDIR)/buf.o
 include ../common.mk

@@ -4,27 +4,36 @@
 #include "vec.h"
 #include <stdalign.h>
 
+#ifdef DEBUG
+int64_t vecallocatedmem = 0;
+#define add_mem(m) (vecallocatedmem += (m))
+#define sub_mem(m) (vecallocatedmem -= (m))
+#else 
+#define add_mem(m) ((void)0)
+#define sub_mem(m) ((void)0) 
+#endif
+
+static int volatile ZERO = 0;
+
 val_t vecnew() {
   errno = 0;
   vec_t v = aligned_alloc(4,sizeof(struct vec_s));
-  if (v == NULL) { 
-    errno = ENOMEM;
-    return valnil; }
-  else {
-    memset(v,0,sizeof(struct vec_s));
-    return val(v);
-  }
+  
+  valreturnif(v == NULL, valnil, ENOMEM);
+  
+  add_mem(sizeof(struct vec_s));
+  memset(v,0,sizeof(struct vec_s));
+  return val(v);
 }
 
 static val_t vec_free(val_t vv);
 
 static void freevecs(val_t *v,uint32_t from, uint32_t to)
 {
-  for (int k=from; k<to; k++) {
-      vecdbg("free: %016lX %d %d",v[k].v,k,valisref(v[k]));
-    if (valisref(v[k])) {
-      vec_free(v[k]);
-      v[k] = valnil;
+  if (v) for (int k=from; k<to; k++) {
+    //valdbg("free: %016lX %d %d",v[k].v,k,valisownedvec(v[k]));
+    if (valisownedvec(v[k])) {
+      v[k] = vec_free(v[k]);
     }
   }
 }
@@ -33,39 +42,23 @@ static val_t vec_free(val_t vv)
 { 
   vec_t v;
   errno = 0;
-  v = val_torealvec(vv); 
+  v = (vec_t)valtocleanpointer(vv); 
   freevecs(v->vec,v->fst,v->cnt);
+  sub_mem(v->sze * sizeof(val_t));
   free(v->vec);
+  sub_mem(sizeof(struct vec_s));
   free(v); 
   return valnil;
 }
 
 val_t vecfree(val_t vv) {
   errno = 0;
-  if (!valisvec(vv) || valisref(vv) ) { errno=EINVAL; return vv; }
-  else return vec_free(vv);
+  
+  valreturnif(!valisvec(vv) || valisownedvec(vv), vv, EINVAL);
+  
+  return vec_free(vv);
 }
 
-val_t vecreffree(val_t vv) {return vec_free(vv);}
-
-val_t vecsetfree_3(val_t vv, uint32_t i, int32_t delta) {
-  vec_t v;
-  val_t x;
-  
-  i = vecindex(vv,i,delta);
-
-  if (i == VECERRORNDX) return valnil;
-
-  v = val_torealvec(vv);
-  x = v->vec[i];
-  if (!valisvec(x)) return x;
-
-  x = vecfree(x);
-
-  v->vec[i] = x;
-  
-  return x;
-}
 
 // Ensure the vector is large enough to store a value at index n
 static int makeroom(vec_t v, uint32_t n)
@@ -74,16 +67,16 @@ static int makeroom(vec_t v, uint32_t n)
   val_t   *new_vec;
 
   errno = 0;
-  if (!v) {errno = EINVAL; return 0;}
+  valreturnif(!v,0, EINVAL);
 
-  vec_dbg("Making room %p (%p)[%d]->[%d]",(void *)v,(void *)(v->vec),v->sze,n);
+  val_dbg("vec Making room %p (%p)[%d]->[%d]",(void *)v,(void *)(v->vec),v->sze,n);
 
   // There should be at least n+1 slots:
   n += 1;
 
   if (n <= v->sze) return 1; // There's enough room
 
-  if (n > VECMAXNDX) {errno = ERANGE; return 0;}; // Max number of elments in a vector reached.
+  valreturnif(n > VECMAXNDX,0,ERANGE); // Max number of elments in a vector reached.
   
   if (n >= 0xD085FAF0) new_sze = n; // an n higher than that would make the new size overflow
   else {
@@ -95,14 +88,14 @@ static int makeroom(vec_t v, uint32_t n)
   
   new_sze += (new_sze & 1); // ensure is even
   
-  if (new_sze <= n) { errno = ERANGE; return 0; }
+  valreturnif(new_sze <= n,0,ERANGE);
 
-  vec_dbg("MKROOM: realloc(%p,%d) [%d]",(v->vec),new_sze * sizeof(val_t),new_sze);
+  val_dbg("MKROOM: realloc(%p,%lu) [%u]->[%u]",(v->vec),new_sze * sizeof(val_t),v->sze, new_sze);
   new_vec = realloc(v->vec, new_sze * sizeof(val_t));
-  vec_dbg("MKROOM: got(%p,%d) [%d]",new_vec,new_sze * sizeof(val_t),new_sze);
+  val_dbg("MKROOM: got(%p,%d) [%d]",new_vec,new_sze * sizeof(val_t),new_sze);
 
-  if (new_vec == NULL) { errno = ENOMEM; return 0; }
-  
+  valreturnif(new_vec == NULL,0,ENOMEM);
+  add_mem((new_sze - v->sze) * sizeof(val_t));
   // set the newly allocated area to 0;
   memset(&(new_vec[v->cnt]),0,(new_sze-v->sze)*sizeof(val_t));
 
@@ -117,12 +110,14 @@ int vec_gap_3(val_t vv, uint32_t i, uint32_t l)
   vec_t v;
   int n;
   errno = 0;
-  if (!valisvec(vv)) {errno = EINVAL; return 0;}
-  v = val_torealvec(vv);
+
+  valreturnif(!valisvec(vv),0,EINVAL);
+
+  v = (vec_t)valtocleanpointer(vv);
 
   if (i == VECNONDX) i = v->cnt;
   if (l == VECNONDX) l = 1;
-  vecdbg("GAP : %d %d",i,l);
+  valdbg("GAP : %d %d",i,l);
 
   if (i < v->cnt) {
     n = v->cnt+l;
@@ -140,7 +135,7 @@ int vec_gap_3(val_t vv, uint32_t i, uint32_t l)
     **  0       cnt   i           0             i     i+l
     */
   }
-  vecdbg("GAP cnt:%d i:%d l:%d n:%d",v->cnt,i,l,n);
+  valdbg("GAP cnt:%d i:%d l:%d n:%d",v->cnt,i,l,n);
   if (!makeroom(v, n)) return 0;
   if (i < v->cnt) {
     memmove(&(v->vec[i+l]),  &(v->vec[i]),  (v->cnt-i)*sizeof(val_t));
@@ -150,42 +145,17 @@ int vec_gap_3(val_t vv, uint32_t i, uint32_t l)
   return 1;
 }
 
-static val_t setval(vec_t v, uint32_t i, val_t x)
-{
-  val_t ret = x;
-  if (valeq(x, valnewvec)) {
-    x = vecnew();
-    ret = x;
-    x.v |= 1; // owned
-    vecdbg("Set %p[%d] at %016lX",(void *)v,i,x.v);
-  }
-  if (valisref(v->vec[i])) vec_free(v->vec[i]);
-  v->vec[i] = x;
-  return ret;
-}
-
-uint32_t vecins_(val_t vv, uint32_t i, val_t x)
-{
-  vec_t v;
-  if (vecmakegap(vv,i,1)) {
-    v = val_torealvec(vv);
-    x = setval(v, i, x);
-    return v->sze;
-  }
-  return VECNONDX; 
-}
-
 val_t *vec(val_t v)
 {
-  if (!valisvec(v)) return NULL;
-  return val_torealvec(v)->vec;
+  valreturnif(!valisvec(v),NULL,EINVAL);
+  return ((vec_t)valtocleanpointer(v))->vec;
 }
 
 int vectype_2(val_t vv,int type)
 { 
   vec_t v;
-  if (!valisvec(vv)) return VEC_ISNULL;
-  v = val_torealvec(vv);
+  valreturnif(!valisvec(vv),VEC_ISNULL,EINVAL);
+  v = (vec_t)valtocleanpointer(vv);
   if (type >=0 ) v->typ = (type & 0x7F) | (v->typ & 0x80);
   return (v->typ & 0x7F);
 }
@@ -194,45 +164,61 @@ uint32_t vecsize_2(val_t vv, uint32_t n)
 {
   vec_t v;
   errno = 0;
-  if (!valisvec(vv)) {errno = EINVAL; return 0;}
-  v = val_torealvec(vv);
-  if (n != VECNONDX && !makeroom(v,n)) return 0;
+  valreturnif(!valisvec(vv),0,EINVAL); 
+  v = (vec_t)valtocleanpointer(vv);
+  valreturnif(n != VECNONDX && !makeroom(v,n),0,0);
   return v->sze;
 }
 
 uint32_t veccount_2(val_t vv, uint32_t n)
 {
-  uint32_t fst = 0;
   vec_t v;
   errno = 0;
 
-  if (!valisvec(vv)) {errno = EINVAL; return 0;}
-  v = val_torealvec(vv);
-  if (vectype(vv) == VEC_ISQUEUE) fst = v->fst;
+  valreturnif(!valisvec(vv),0,EINVAL);
+  
+  v = (vec_t)valtocleanpointer(vv);
 
-  if (n != VECNONDX)  {
-    n += fst;
-    if (!makeroom(v, n)) return 0;
+  if (n != VECNONDX && (n < (VECMAXNDX - v->fst)))  {
+    n += v->fst;
+    valreturnif(!makeroom(v, n), 0, ENOMEM);
     v->cnt = n;
   }
 
-  return v->cnt - fst;
+  return v->cnt - v->fst;
+}
+
+// ADDING VALUES TO VEC
+
+static val_t setval(vec_t v, uint32_t i, val_t x)
+{
+  // I'm about to overwrite an owned vector. Free it! (unless it is the same!)
+  if ((v->fst <= i && i < v->cnt) && valisownedvec(v->vec[i]))
+    if (v->vec[i].v != (x.v | 1)) vec_free(v->vec[i]);
+  v->vec[i] = x;
+  return x;
+}
+
+val_t vecins_(val_t vv, uint32_t i, val_t x)
+{
+  vec_t v;
+
+  valreturnif(!vecmakegap(vv,i,1),valerror,ENOMEM);
+
+  v = (vec_t)valtocleanpointer(vv);
+  return setval(v, i, x);
 }
 
 val_t vecset_(val_t vv, uint32_t i, val_t x)
 {
   errno = 0;
-  if (!valisvec(vv)) { 
-    errno=EINVAL; 
-    return valerror; 
-  }
+  valreturnif(!valisvec(vv), valerror, EINVAL);
 
-  vec_t v = val_torealvec(vv);
+  vec_t v = (vec_t)valtocleanpointer(vv);
 
   if (i == VECNONDX) i = v->cnt;
   
-  if (!makeroom(v,i)) 
-    return valerror;
+  valreturnif(!makeroom(v,i), valerror, ENOMEM);
 
   x=setval(v, i, x);
 
@@ -240,21 +226,67 @@ val_t vecset_(val_t vv, uint32_t i, val_t x)
   return x;
 }
 
+val_t vecown_3_(val_t vv, uint32_t i, val_t x)
+{
+  if (valeq(x,valown)) x = vecget(vv,i);
+  if (valisvec(x)) x.v |= 1;
+  return vecset_(vv,i,x);
+}
+
+val_t vecdisown(val_t vv, uint32_t i)
+{
+  val_t x = vecget(vv,i);
+ 
+  if (valisownedvec(x)) {
+    //valdbg("disowned");
+    x.v &= ((uint64_t)0xFFFFFFFFFFFFFFFE);
+    ((vec_t)valtocleanpointer(vv))->vec[i] = x;
+    return x;
+  }
+  else return x;
+}
+
+val_t vecpush_(val_t vv, val_t x, int own) 
+{ 
+  errno = 0;
+  valreturnif(!valisvec(vv), valerror, EINVAL);
+  vectype(vv, VEC_ISSTACK); 
+  if (own) return vecown_3_(vv,VECNONDX,x);
+  return vecset_(vv,VECNONDX,x); 
+}
+
+val_t vecenq_(val_t vv, val_t x,int own)
+{
+  vec_t v;
+  errno = 0;
+  valreturnif(!valisvec(vv), valerror, EINVAL);
+
+  vectype(vv,VEC_ISQUEUE);
+  v = (vec_t)valtocleanpointer(vv);
+  if ((v->fst > (v->cnt / 2)) && (v->cnt >= v->sze)) {
+    memmove(v->vec, &(v->vec[v->fst]), (v->cnt - v->fst) * sizeof(val_t));
+    v->cnt -= v->fst;
+    v->fst = 0;
+  }
+  
+  if (own) return vecown_3_(vv,VECNONDX,x);
+  return vecset_(vv,VECNONDX,x); 
+}
+
 #define vec_data(v_) ((v_)->vec)
 
-val_t vecget_3(val_t vv, uint32_t i, int32_t delta)
+val_t vecget_2(val_t vv, uint32_t i)
 {
   vec_t v;
   errno = 0;
   val_t x;
 
-  i = vecindex(vv, i, delta);
-  if (i == VECERRORNDX) 
-    return valnil;
+  valreturnif(!valisvec(vv), valnil, EINVAL);
+  v = (vec_t)valtocleanpointer(vv);
 
-  v = val_torealvec(vv);
   if (i == VECNONDX) i = v->cnt - 1; // Get the last element
-  if (i >= v->cnt) {errno = ERANGE; return valnil; }
+  valreturnif(i >= v->cnt, valnil, ERANGE);
+
   x = v->vec[i];
   return x;
 }
@@ -265,12 +297,12 @@ uint32_t vecdel_3(val_t vv, uint32_t i, uint32_t j)
   vec_t v;
   errno = 0;
   
-  if (!valisvec(vv)) {errno = EINVAL; return VECERRORNDX; }
-  if (vecisempty(vv)) return 0;
+  valreturnif(!valisvec(vv), 0, EINVAL);
+  valreturnif(vecisempty(vv), 0, ERANGE);
 
-  v = val_torealvec(vv);
+  v = (vec_t)valtocleanpointer(vv);
 
-  vec_dbg("i = %d, j = %d, cnt = %d, sze = %d",i,j,v->cnt,v->sze);
+  val_dbg("i = %d, j = %d, cnt = %d, sze = %d",i,j,v->cnt,v->sze);
   if (i == VECNONDX) { i = v->cnt-1; j = i; }
   else if (j == VECNONDX) j = i;
   if (i >= v->cnt || j<i) return 0;
@@ -291,7 +323,7 @@ uint32_t vecdel_3(val_t vv, uint32_t i, uint32_t j)
     memmove(&(v->vec[i]) , &(v->vec[i+l]),  (v->cnt-(i+l)) * sizeof(val_t));
     v->cnt -= l;
   }
-  vec_dbg("i = %d, j = %d, cnt = %d, sze = %d",i,j,v->cnt,v->sze);
+  val_dbg("i = %d, j = %d, cnt = %d, sze = %d",i,j,v->cnt,v->sze);
   return(v->cnt);
 }
 
@@ -299,86 +331,66 @@ uint32_t vecdrop_2(val_t vv, uint32_t n) {
   vec_t v;
   uint32_t cnt;
   errno = 0;
-  if (!valisvec(vv)) {errno = EINVAL; return 0; }
+
+  valreturnif(!valisvec(vv), 0, EINVAL);
+
   cnt = veccount(vv);
 
-  if (n == 0 || cnt == 0) return cnt;
+  if (n != 0 && cnt != 0) {
+    v = (vec_t)valtocleanpointer(vv);
+    if (n >= cnt) n = cnt;
 
-  v = val_torealvec(vv);
-  if (n >= cnt) n = cnt;
+    freevecs(v->vec,v->cnt-n,v->cnt);
 
-  freevecs(v->vec,v->cnt-1,v->cnt-n+1);
-
-  v->cnt -= n;
-  if (v->fst >= v->cnt) {
-     v->fst = 0; v->cnt = 0; v->typ = VEC_ISVEC;
+    v->cnt -= n;
+    if (v->fst >= v->cnt) {
+       v->fst = 0; v->cnt = 0; v->typ = VEC_ISVEC;
+    }
+    cnt = (v->cnt);
   }
-  return(v->cnt);
-}
-
-val_t vecpush_(val_t vv, val_t x) 
-{ 
-  errno = 0;
-  if (!valisvec(vv)) {(errno=EINVAL); return valerror; }
-  vectype(vv, VEC_ISSTACK); 
-  return vecset_(vv,VECNONDX,x); 
-}
-
-val_t vecenq_(val_t vv, val_t x)
-{
-  vec_t v;
-  errno = 0;
-  if (!valisvec(vv)) {errno = EINVAL; return valerror; }
-  vectype(vv,VEC_ISQUEUE);
-  v = val_torealvec(vv);
-  if ((v->fst > (v->cnt / 2)) && (v->cnt >= v->sze)) {
-    memmove(v->vec, &(v->vec[v->fst]), (v->cnt - v->fst) * sizeof(val_t));
-    v->cnt -= v->fst;
-    v->fst = 0;
-  }
-  return vecset_(vv,VECNONDX,x); 
+  return cnt;
 }
 
 // Deque (removes the next n elements form the queue)
 uint32_t vecdeq_2(val_t vv, uint32_t n) 
 {
-  uint32_t x = 0;
+  uint32_t ret = 0;
   vec_t v;
   errno = 0;
 
-  if (!valisvec(vv)) {errno = EINVAL; return 0; }
-  if (veccount(vv) == 0) return 0;
-  if (vectype(vv) != VEC_ISQUEUE) { errno = EINVAL; return 0; }
-  v = val_torealvec(vv);
-  if (v->cnt < (v->fst + n) ) {
-    freevecs(v->vec,0,v->cnt);
-    v->fst = v->cnt = 0;
-    v->typ = VEC_ISVEC;
-  }
-  else {
-    freevecs(v->vec,v->fst,v->fst+n);
+  valreturnif(!valisvec(vv), 0, EINVAL);
+  valreturnif(vectype(vv) != VEC_ISQUEUE, 0, EINVAL);
+  
+  ret = veccount(vv);
 
-    v->fst += n;
+  if (ret > 0) {
+    v = (vec_t)valtocleanpointer(vv);
+    n += v->fst;
+    if (n > v->cnt) n = v->cnt;
+
+    freevecs(v->vec, v->fst, n);
+    v->fst = n;
     if (v->fst >= v->cnt) {
       v->fst = 0; v->cnt = 0;
       v->typ = VEC_ISVEC;
     }
-    x = v->cnt - v->fst;
+    ret = v->cnt - v->fst;
   }
-  return x;
+  return ret;
 }
 
 uint32_t vecindex_3(val_t vv,uint32_t ndx, int32_t delta)
 {
   uint32_t ret = VECERRORNDX;
   errno = 0;
-  if (!valisvec(vv)) {errno = EINVAL; return VECERRORNDX; }
+  
+  valreturnif(!valisvec(vv), VECERRORNDX, EINVAL);
+  valreturnif(vecisempty(vv), VECERRORNDX, EINVAL);
 
-  if (vecisempty(vv)) return VECERRORNDX;
+  vec_t v = (vec_t)valtocleanpointer(vv);
 
-  vec_t v = val_torealvec(vv);
-
-  if (ndx <= VECNONDX)         ret = ndx;
+  if (ndx < VECNONDX)          ret = ndx;
+  else if (ndx == VECNONDX)    ret = ndx;
   else if (ndx == VECCOUNTNDX) ret = v->cnt;
   else if (ndx == VECSIZENDX)  ret = v->sze;
   else switch(vectype(vv)) {
@@ -439,53 +451,4 @@ uint32_t vecindex_3(val_t vv,uint32_t ndx, int32_t delta)
   return ret;
 }
 
-val_t vecref(val_t v)
-{
-  if (!valisvec(v)) return v;
-  v.v |= 1;
-  return v;
-}
 
-val_t vecunref_1(val_t v)
-{
-  if (!valisvec(v)) return v;
-  v.v &= 0xFFFFFFFFFFFFFFFE;
-  return v;
-}
-
-val_t vecunref_2(val_t v, uint32_t i)
-{
-  if (!valisvec(v)) return v;
-
-  val_t x = vecget(v,i);
-  if (valisvec(x))  x.v &= 0xFFFFFFFFFFFFFFFE; 
-
-  return x;
-}
-
-val_t vecown_1_(val_t *vp)
-{
-  return (*vp = vecref(*vp));
-}
-
-val_t vecown_3(val_t vv, uint32_t i, int32_t delta)
-{
-  vec_t v = val_torealvec(vv);
-  if (!valisvec(v)) return valnil;
-  i = vecindex_3(v,i,delta);
-  if (i == VECERRORNDX) return valnil;
-  if (!valisvec(v->vec[i])) return valnil;
-
-  v->vec[i].v != 1;
-  return v->vec[i];
-}
-
-val_t vecdisown_1_(val_t *vp)
-{
-  return (*vp = vecunref(*vp));
-}
-
-val_t vecdisown_3(val_t v, uint32_t i, int32_t delta)
-{
-  
-}

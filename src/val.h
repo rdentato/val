@@ -35,24 +35,16 @@
 //          7FF8
 
 typedef struct {uint64_t v;} val_t;
-typedef struct {char *s;} chs_t;
+
 typedef struct vec_s *vec_t;
-typedef struct blk_s *blk_t;
-
-typedef struct val_dta_s {
-  void *ptr;
-  uint32_t sze;
-  uint32_t cnt;
-} val_dta_t;
-
+typedef struct buf_s *buf_t;
 
 // Some bitmask
 #define VAL_TYPE_MASK ((uint64_t)0xFFFF000000000000)
 #define VAL_NAN_MASK  ((uint64_t)0x7FF0000000000000)
 #define VAL_PAYLOAD   ((uint64_t)0x0000FFFFFFFFFFFF)
 
-#define VAL_OWN_MASK  ((uint64_t)0xFFFE000000000001)
-#define VAL_BLK_MASK  ((uint64_t)0xFFFE000000000000)
+#define VAL_BUF_MASK  ((uint64_t)0xFFFE000000000000)
 #define VAL_VEC_MASK  ((uint64_t)0xFFFF000000000000)
 
 #define VAL_STR_MASK  ((uint64_t)0x7FFC000000000000)
@@ -62,8 +54,6 @@ typedef struct val_dta_s {
 #define VAL_CST_MASK  ((uint64_t)0xFFF9000000000000)
 #define VAL_BOL_MASK  ((uint64_t)0xFFF8FFFFFFFFFF00)
 
-#define valisowned(x) ((val(x).v & VAL_OWN_MASK) == VAL_OWN_MASK)
-
 // Check the type of a val_t variable
 #define valisinteger(x) ((val(x).v & (uint64_t)0xFFFE000000000000) == VAL_UNS_MASK)
 #define valissigned(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_INT_MASK)
@@ -72,7 +62,10 @@ typedef struct val_dta_s {
 #define valispointer(x) ((val(x).v & VAL_TYPE_MASK) == VAL_PTR_MASK)
 #define valisstring(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_STR_MASK)
 #define valisvec(x)     ((val(x).v & VAL_TYPE_MASK) == VAL_VEC_MASK)
-#define valisblk(x)     ((val(x).v & VAL_TYPE_MASK) == VAL_BLK_MASK)
+#define valisbuf(x)     ((val(x).v & VAL_TYPE_MASK) == VAL_BUF_MASK)
+
+#define valisownedvec(x)  ((val(x).v & (VAL_TYPE_MASK | 1)) == (VAL_VEC_MASK | 1))
+#define valisownedbuf(x)  ((val(x).v & (VAL_TYPE_MASK | 1)) == (VAL_BUF_MASK | 1))
 
 #define valeq(x,y)      (val(x).v == val(y).v)
 
@@ -93,7 +86,7 @@ static inline val_t val_frombool(_Bool v)            {val_t ret; ret.v = VAL_BOL
 static inline val_t val_fromptr(void *v)             {val_t ret; ret.v = VAL_PTR_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
 static inline val_t val_fromstr(void *v)             {val_t ret; ret.v = VAL_STR_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
 static inline val_t val_fromvec(void *v)             {val_t ret; ret.v = VAL_VEC_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
-static inline val_t val_fromblk(void *v)             {val_t ret; ret.v = VAL_BLK_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
+static inline val_t val_frombuf(void *v)             {val_t ret; ret.v = VAL_BUF_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
 
 static inline val_t val_fromdouble(double v)         {val_t ret; memcpy(&ret,&v,sizeof(val_t)); return ret;}
 static inline val_t val_fromfloat(float f)           {return val_fromdouble((double)f);}
@@ -113,12 +106,14 @@ static inline val_t val_fromval(val_t v)             {return v;}
                             float: val_fromfloat,  \
                             val_t: val_fromval,    \
                             vec_t: val_fromvec,    \
-                            blk_t: val_fromblk,    \
+                            buf_t: val_frombuf,    \
                   unsigned char *: val_fromstr,    \
                            char *: val_fromstr,    \
                            void *: val_fromptr) (x)
 
 #define val(x) _Generic((x), val_t: x, default: val_(x))
+
+#define valpayload(x) (val(x).v & VALPAYLOAD)
 
 // Retrieve a value from a val_t variable
 #define valtodouble(v) val_todouble(val(v))
@@ -144,9 +139,11 @@ static inline   void *val_topointer(val_t v, uint64_t mask) { return (void *)((u
 #define val_to_pointer(v_, m_) ((void *)((uintptr_t)((val(v_).v) & (m_))))
 
 #define valtopointer(v) val_to_pointer(v,VAL_PAYLOAD)
+#define valtocleanpointer(v) ((void *)val_to_pointer(v,(uint64_t)0x0000FFFFFFFFFFFE))
+
 #define valtostring(v) ((char *)valtopointer(v))
 #define valtovec(v)    ((vec_t)valtopointer(v))
-#define valtoblk(v)    ((blk_t)valtopointer(v))
+#define valtobuf(v)    ((buf_t)valtopointer(v))
 
 // Some constant
 #define valfalse      ((val_t){0xFFF8FFFFFFFFFF00})
@@ -163,8 +160,18 @@ static inline   void *val_topointer(val_t v, uint64_t mask) { return (void *)((u
 #define valdisown     ((val_t){0xFFF80AAAAAAAAAA2})
 #define valnilpointer ((val_t){0xFFFD000000000000})
 
-#define valconst(x)   ((val_t){0x7FF9000000000000 | (uint32_t)(x)})
-#define valisconst(x) ((val(x).v & (uint64_t)0xFFFFFFFF00000000) == ((uint64_y)0x7FF800000000000))
+
+#define val_first(x,...) x
+#define val_rest(x,...) __VA_ARGS__
+
+#define valconst(...) valconst_(val_first(__VA_ARGS__),val_rest(__VA_ARGS__) +0)
+#define valconst_(x,y)  ((val_t){((0xFFF9000000000000 + (y) * 0x1000000000000)) | ((uint64_t)((uintptr_t)(x)) & VAL_PAYLOAD)})
+
+#define valisconst(...) valisconst_(val_first(__VA_ARGS__),val_rest(__VA_ARGS__) +0)
+#define valisconst_(x,y) ((val(x).v & (uint64_t)0xFFFF000000000000) == ((uint64_t)0xFFF9000000000000 + (y) * 0x1000000000000))
+
+//#define valconst(x)   ((val_t){0xFFF9000000000000 | ((uint64_t)((uintptr_t)(x)) & VAL_PAYLOAD)})
+//#define valisconst(x) ((val(x).v & (uint64_t)0xFFFF000000000000) == ((uint64_t)0xFFF8000000000000))
 
 #define valnilstr   val_nilstr()
 static inline val_t val_nilstr() {static char *s=""; return val_fromstr(s);}
@@ -176,7 +183,7 @@ static inline val_t val_nilstr() {static char *s=""; return val_fromstr(s);}
 #define VALPOINTER  5
 #define VALSTRING   6
 #define VALVEC      7
-#define VALBLK      8
+#define VALBUF      8
 
 static inline int valtype(val_t v) {
   if (valisdouble(v))  return VALDOUBLE;
@@ -186,8 +193,22 @@ static inline int valtype(val_t v) {
   if (valispointer(v)) return VALPOINTER;
   if (valisstring(v))  return VALSTRING;
   if (valisvec(v))     return VALVEC; 
-  if (valisblk(v))     return VALBLK; 
+  if (valisbuf(v))     return VALBUF; 
   return 0;
 }
+
+#define valreturnif(x,r,e) if (!(x)) ; else do {errno = (e); return r;} while (0) 
+
+// DBG
+#if defined(NDEBUG) && defined(DEBUG)
+#undef DEBUG
+#endif
+
+#ifdef DEBUG
+  #define valdbg(...) (fprintf(stderr,"      INFO|  "),fprintf(stderr, __VA_ARGS__),fprintf(stderr," [%s:%d]\n",__FILE__,__LINE__))
+#else
+  #define valdbg(...)
+#endif
+#define val_dbg(...)
 
 #endif

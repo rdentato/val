@@ -11,78 +11,157 @@ tstsuite("Check owning reference") {
     val_t x = valnil;
     val_t y = valnil;
 
-    tstcase("Creating a ref") {
-      tstcheck(!valisnil((v = vecnew())));
-      tstcheck(vectype(v) == VEC_ISVEC);
-      tstcheck(valisvec(x = vecref(vecnew())));
+    tstcase("Check that owned vectors get freed up") {
+        v = vecnew();
+        tstassert(!valisnil(v));
 
-      tstcheck((x.v & 1) == 1);
-      tstcheck(valisref(x));
+        // Set an owned vector
+        x = vecnew();
+        tstassert(!valisnil(x));
+        y = vecown(v,0,x);
+        tstcheck((x.v | 1) == y.v );
 
-      tstcheck(!valisnil(x=vecfree(x))); // Won't free anything
-
-      vecset(v,1,x);
-
-      v = vecfree(v); // will also free x
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == 0);
     }
 
-    tstcase("unref of a variable") {
-      tstcheck(!valisnil((v = vecnew())));
-      tstcheck(vectype(v) == VEC_ISVEC);
-      tstcheck(valisvec(x = vecref(vecnew())));
+    tstcase("Check that not owned vectors are not freed up") {
+        v = vecnew();
+        tstassert(!valisnil(v));
 
-      tstcheck((x.v & 1) == 1);
-      tstcheck(valisref(x));
+        // Set a non owned vector
+        x = vecnew();
+        tstassert(!valisnil(x));
+        y = vecset(v,0,x);
+        tstcheck(x.v == y.v);
 
-      tstcheck(!valisnil(x=vecfree(x))); // Won't free anything
-      y = x;
-      tstcheck(!valeq((y=vecunref(x)),x));
-
-      tstcheck((y.v | 1) == x.v);
-
-      tstcheck(valisnil(y=vecfree(y))); // will free y (former x)
-
-      v = vecfree(v); // will also free x
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == sizeof(struct vec_s));
+        x = vecfree(x);
+        tstcheck(vecallocatedmem == 0);
     }
-    
-    
-    tstcase("unref of an element in the vector") {
-      tstcheck(!valisnil((v = vecnew())));
-      tstcheck(vectype(v) == VEC_ISVEC);
 
-      tstcheck(valisvec((x = vecset(v,1,vecref(vecnew())))));
-      tstcheck(valisref(x));
-      
-      vecsetfree(v,1);
+    tstcase("Check that not owned vectors can be owned") {
+        v = vecnew();
+        tstassert(!valisnil(v));
 
-      tstassert(valisref(vecget(v,1)));
+        // Set an owned vector
+        x = vecnew();
+        y = vecset(v,1,x);
+        tstcheck(x.v == y.v);
 
-      x = vecfree(vecget(v,1));
-      tstcheck(!valisnil(x));
+        y = vecown(v,1);
+        tstassert((x.v|1) == y.v);
 
-      tstassert(valisref(vecget(v,1)));
-
-      v = vecfree(v); // will also free x
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == 0);
     }
-    
-    tstcase("unref of an element in the vector") {
-      tstcheck(!valisnil((v = vecnew())));
-      tstcheck(vectype(v) == VEC_ISVEC);
 
-      tstcheck(valisvec((x = vecset(v,1,vecref(vecnew())))));
-      tstcheck(valisref(x));
-      
-      vecsetfree(v,1);
+    tstcase("Check that owned vectors can be disowned") {
+        v = vecnew();
+        tstassert(!valisnil(v));
 
-      tstassert(valisref(vecget(v,1)));
+        // Set an owned vector
+        x = vecnew();
+        tstassert(!valisnil(x));
 
-      x = vecfree(vecget(v,1));
-      tstcheck(!valisnil(x));
+        y = vecown(v,0,x);
+        tstcheck((x.v | 1) == y.v );
 
-      tstassert(valisref(vecget(v,1)));
+        y = vecdisown(v,0);
+        tstcheck(x.v == y.v);
 
-      v = vecfree(v); // will also free x
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == sizeof(struct vec_s), "Expectd %lu, got %lu",sizeof(struct vec_s),vecallocatedmem);
+        x = vecfree(x);
+        tstcheck(vecallocatedmem == 0);
     }
+
+    tstcase("Check that an owned vec can't be freed with vecfree()") {
+        v = vecnew();
+        tstassert(!valisnil(v));
+
+        // Set an owned vector
+        x = vecnew(); y = x;
+        tstassert(!valisnil(x));
+        x = vecown(v,0,x);
+        tstcheck(x.v == (y.v | 1));
+        int64_t old_mem = vecallocatedmem;
+        x = vecfree(x);
+        tstcheck(!valisnil(x));
+        tstcheck(old_mem == vecallocatedmem);
+
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == 0);
+    }
+
+    tstcase("Check that overwriting will result in a free") {
+        v = vecnew();
+        tstassert(!valisnil(v));
+        x = vecnew(); y = x;
+        tstassert(!valisnil(x));
+        x = vecown(v,0,x);
+        int64_t old_mem = vecallocatedmem;
+
+        vecset(v,0,42); // OVERWRITE!
+        tstcheck(old_mem == vecallocatedmem + sizeof(struct vec_s));
+
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == 0);
+    }
+
+    tstcase("Check that delete will result in a free") {
+        v = vecnew();
+        tstassert(!valisnil(v));
+        x = vecnew();
+        tstassert(!valisnil(x));
+        x = vecown(v,0,x);
+        x = vecnew();
+        tstassert(!valisnil(x));
+        x = vecown(v,1,x);
+        int64_t old_mem = vecallocatedmem;
+
+        vecdel(v,1); // 
+        tstcheck(old_mem == vecallocatedmem + sizeof(struct vec_s));
+        old_mem = vecallocatedmem;
+
+        vecdel(v,0); // +
+        tstcheck(old_mem == vecallocatedmem + sizeof(struct vec_s));
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == 0);
+    }
+
+    tstcase("Check that delete will result in a free") {
+        v = vecnew();
+        tstassert(!valisnil(v));
+        x = vecnew();
+        tstassert(!valisnil(x));
+        x = vecown(v,0,x);
+        x = vecnew();
+        tstassert(!valisnil(x));
+        x = vecown(v,1,x);
+        int64_t old_mem = vecallocatedmem;
+
+        vecdel(v,0,1); // 
+        tstcheck(old_mem == vecallocatedmem + 2*sizeof(struct vec_s));
+
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == 0);
+    }
+
+    tstcase("Check that owning twice is armless") {
+        v = vecnew();
+        tstassert(!valisnil(v));
+        x = vecnew();
+        tstassert(!valisnil(x));
+        x = vecown(v,0,x);
+        int64_t old_mem = vecallocatedmem;
+        x = vecown(v,0,x); // This is harmless
+        tstcheck(old_mem == vecallocatedmem,"Expect %lu, got %lu",old_mem,vecallocatedmem);
+        v = vecfree(v);
+        tstcheck(vecallocatedmem == 0);       
+    }
+
         //if (valisvec(v)) v=vecfree(v);
     tstcheck(valisnil(v));
 }

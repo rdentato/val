@@ -79,12 +79,10 @@
 
 #define VEC_cnt(x1,x2,x3,x4,xN, ...) xN
 #define VEC_n(...)       VEC_cnt(__VA_ARGS__, 4, 3, 2, 1, 0)
-#define VEC_join(x ,y)   x ## y
+#define VEC_join(x, y)   x ## y
 #define VEC_cat(x, y)    VEC_join(x, y)
 #define VEC_vrg(f, ...)  VEC_cat(f, VEC_n(__VA_ARGS__))(__VA_ARGS__)
 #define VEC_VRG(f, ...)  VEC_cat(f, VEC_n(__VA_ARGS__))(__VA_ARGS__)
-
-#define val_torealvec(vv) ((vec_t)val_to_pointer(vv,(uint64_t)0x0000FFFFFFFFFFFE))
 
 /**
  * @struct vec_s
@@ -192,11 +190,6 @@ val_t vecnew();
  * @endcode
  */
 val_t vecfree(val_t vv);
-val_t vecrefree(val_t vv);
-
-#define vecsetfree(...) VEC_vrg(vecsetfree_,__VA_ARGS__)
-#define vecsetfree_2(v,i) vecsetfree_3(v,i,0)
-val_t vecsetfree_3(val_t v, uint32_t i, int32_t delta);
 
 /**
  * @fn val_t *vec(val_t v)
@@ -401,7 +394,7 @@ val_t vecset_(val_t v, uint32_t i, val_t x);
 #define vecadd(v,x)    vecset_(v,VECNONDX,val(x))
 
 /**
- * @fn val_t vecget(val_t v , uint32_t i, int32_t delta)
+ * @fn val_t vecget(val_t v , uint32_t i)
  * 
  * @brief Retrieve an element from the vector at the specified index.
  *
@@ -432,9 +425,8 @@ val_t vecset_(val_t v, uint32_t i, val_t x);
  *
  */
 #define vecget(...) VEC_vrg(vecget_,__VA_ARGS__)
-#define vecget_1(v) vecget_3(v,0,0)
-#define vecget_2(v,n) vecget_3(v,n,0)
-val_t vecget_3(val_t v, uint32_t i, int32_t delta);
+#define vecget_1(v) vecget_2(v,vecindex(VECCURNDX,0))
+val_t vecget_2(val_t v, uint32_t i);
 
 /**
  * @fn val_t vecdel(val_t v, uint32_t i [, uint32_t j] )
@@ -472,14 +464,13 @@ val_t vecget_3(val_t v, uint32_t i, int32_t delta);
 #define vecdel_2(v,i) vecdel_3(v,i,VECNONDX)
 uint32_t vecdel_3(val_t v, uint32_t i, uint32_t j);
 
-
 #define vecmakegap(...)   VEC_vrg(vec_gap_,__VA_ARGS__)
 #define vec_gap_1(v)      vec_gap_3(v, VECNONDX, VECNONDX)
 #define vec_gap_2(v,l)    vec_gap_3(v,VECNONDX, l)
 int vec_gap_3(val_t v, uint32_t i, uint32_t l);
 
 #define vecins(v,i,x)    vecins_(v,i,val(x))
-uint32_t vecins_(val_t vv, uint32_t i, val_t x);
+val_t vecins_(val_t vv, uint32_t i, val_t x);
 
 /**
  * @fn val_t vecpush(val_t v, val_t x)
@@ -502,8 +493,9 @@ uint32_t vecins_(val_t vv, uint32_t i, val_t x);
  *     vecpush(my_stack, "Total");  // Push another value onto my_stack
  * @endcode
  */
-#define vecpush(v,x) vecpush_(v,val(x))
-val_t vecpush_(val_t vv, val_t x);
+#define vecpush(v,x)    vecpush_(v,val(x),0)
+#define vecpushown(v,x) vecpush_(v,val(x),1)
+val_t vecpush_(val_t vv, val_t x, int own);
 
 /**
  * @fn val_t vectop(val_t v, int32_t delta)
@@ -526,10 +518,8 @@ val_t vecpush_(val_t vv, val_t x);
  * @endcode
  */
 #define vectop(...)  VEC_vrg(vectop_,__VA_ARGS__)
-#define vectop_1(v)   vecget_3(v,VECTOPNDX,0)
-#define vectop_2(v,d) vecget_3(v,VECTOPNDX,d)
-
-#define vecpop(...) vecdrop(__VA_ARGS__)
+#define vectop_1(v)   vectop_2(v,0)
+static inline val_t vectop_2(val_t v, uint32_t d) {return vecget_2(v,vecindex_3(v,VECTOPNDX,d));}
 
 /**
  * @fn val_t vecdrop(val_t v [, uint32_t n])
@@ -565,6 +555,8 @@ val_t vecpush_(val_t vv, val_t x);
 #define vecdrop_1(v) vecdrop_2(v,1)
 uint32_t vecdrop_2(val_t v, uint32_t n);
 
+#define vecpop(...) vecdrop(__VA_ARGS__)
+
 /**
  * @fn val_t vecenq(val_t v, val_t x);
  * @brief Enqueue a value onto the queue.
@@ -576,8 +568,7 @@ uint32_t vecdrop_2(val_t v, uint32_t n);
  *
  * @param x The value of type `val_t` to be enqueued.
  *
- * @return The position (index) where the value was enqueued, or `VECNONDX`
- *         to indicate any issues.
+ * @return The value that has been enqueued
  *
  * Example usage:
  * @code
@@ -585,8 +576,9 @@ uint32_t vecdrop_2(val_t v, uint32_t n);
  *     vecenq(my_queue, someValue);  // Enqueue someValue onto my_queue
  * @endcode
  */
-#define vecenq(v,x) vecenq_(v,val(x))
-val_t vecenq_(val_t v, val_t x);
+#define vecenq(v,x) vecenq_(v,val(x),0)
+#define vecenqown(v,x) vecenq_(v,val(x),1)
+val_t vecenq_(val_t v, val_t x, int own);
 
 /**
  * @fn uint32_t vecdeq(val_t v [, uint32_t n])
@@ -624,8 +616,8 @@ val_t vecenq_(val_t v, val_t x);
 #define vecdeq_1(v) vecdeq_2(v,1)
 uint32_t vecdeq_2(val_t v, uint32_t n);
 
-#define vechead(vv) vecget(vv,VECHEADNDX)
-#define vectail(vv) vecget(vv,VECTAILNDX)
+// #define vechead(vv) vecget(vv,VECHEADNDX)
+// #define vectail(vv) vecget(vv,VECTAILNDX)
 
 /**
  * @fn val_t veclast(val_t v,int32_t delta)
@@ -651,9 +643,9 @@ uint32_t vecdeq_2(val_t v, uint32_t n);
  *     val_t firstValue = veclast(my_queue);  // Get the last value without dequeuing it
  * @endcode
  */
-#define veclast(...) VEC_vrg(veclast_,__VA_ARGS__)
-#define veclast_1(v)   vecget_3(v,VECLASTNDX,0)
-#define veclast_2(v,d) vecget_3(v,VECLASTNDX,d)
+#define veclast(...)  VEC_vrg(veclast_, __VA_ARGS__)
+#define veclast_1(v)  veclast_2(v, 0)
+static inline val_t   veclast_2(val_t v,uint32_t d) { return vecget_2(v,vecindex_3(v,VECLASTNDX,d)); }
 
 /**
  * @fn val_t vecfirst(val_t v,int32_t delta)
@@ -666,8 +658,11 @@ uint32_t vecdeq_2(val_t v, uint32_t n);
  * @param v The queue of type `val_t` whose first value is to be retrieved.
  *          Ensure that `v` is a valid and initialized queue.
  *
+ * @param d The offset from the first (toward the last) to be retrieved.
+ * 
  * @return The first value of type `val_t` in the queue. If the queue is 
- *         empty, the function returns `valnil`.
+ *         empty, or the offset is past the end of the queue, the function
+ *         returns `valnil`.
  *
  * Example usage:
  * @code
@@ -676,41 +671,59 @@ uint32_t vecdeq_2(val_t v, uint32_t n);
  *     val_t firstValue = vecfirst(my_queue);  // Get the first inserted value
  * @endcode
  */
-#define vecfirst(...) VEC_vrg(vecfirst_,__VA_ARGS__)
-#define vecfirst_1(v)   vecget_3(v,VECFIRSTNDX,0)
-#define vecfirst_2(v,d) vecget_3(v,VECFIRSTNDX,d)
+#define vecfirst(...)  VEC_vrg(vecfirst_,__VA_ARGS__)
+#define vecfirst_1(v)  vecfirst_2(v,0)
+static inline val_t vecfirst_2(val_t v, uint32_t d) { return vecget_2(v,vecindex_3(v,VECFIRSTNDX,d)); }
+
+/**
+ * @fn val_t vecown(val_t vv, uint32_t ndx, val_t x)
+ * 
+ * @brief Sets the value of the specified element in the vector 'vv' to the value 'x'.
+ *        If 'x' is a vector itself, it is marked as "owned" by 'vv'.
+ *        An "owned vector" is automatically freed when the owning vector 'vv' is freed.
+ *
+ * This function is similar to 'vecset()' but with the added functionality of handling
+ * ownership of vectors. If 'x' is a vector, it becomes owned by 'vv', meaning that
+ * it will be automatically deallocated when 'vv' is freed or when the elements are 
+ * deleted from the vector (e.g. with vecdrop()) or overwritten.
+ *
+ * @param vv The vector in which the element is to be set. This vector becomes the owner
+ *           if 'x' is a vector. Must not be NULL.
+ * @param ndx The index of the element in 'vv' to be set. 
+ * @param x The value to set at the specified index in 'vv'. If 'x' is a vector,
+ *          it becomes owned by 'vv'.
+ *
+ * @return The x value (possibly modified if it has been owned)
+ *
+ * @note Owned vectors must be treated with extreme care. The general rule is that
+ *       at any given time, there must be ONE AND ONLY ONE owner. This meaans, for example,
+ *       that you can't do something like:
+ *                x = vecnew();
+ *                x = vecown(v, 3, x);
+ *                x = vecset(t, 2, x); // THIS WILL RESULT IN TWO OWNERS!!
+ *       The same is valid also if you 
+ */
+
+#define vecown(...) VEC_vrg(vecown_,__VA_ARGS__)
+#define vecown_2(v,i)   vecown_3_(v,i,valown)
+#define vecown_3(v,i,x) vecown_3_(v,i,val(x))
+val_t vecown_3_(val_t vv, uint32_t i, val_t x);
+
+val_t vecdisown(val_t vv, uint32_t i);
+
+#define vecdisowntop(...) VEC_vrg(vcedisowntop_,__VA_ARGS__)
+#define vecdisowntop_1(vv) vecdisownfirst_2(vv,0)
+static inline val_t vecdisowntop_2(val_t vv, int32_t delta) { return vecdisown(vv,vecindex_3(vv,VECTOPNDX,delta)); }
+
+#define vecdisownfirst(...) VEC_vrg(vcedisownfirst_,__VA_ARGS__)
+#define vecdisownfirst_1(vv) vecdisownfirst_2(vv,0)
+static inline val_t vecdisownfirst_2(val_t vv, int32_t delta) { return vecdisown(vv,vecindex_3(vv,VECFIRSTNDX,delta)); }
+
 
 uint32_t vecsearch(val_t v, val_t x, val_t aux);
 uint32_t vecsort(val_t v, int (*cmp)(val_t a, val_t b, val_t aux), val_t aux);
 
 
-#define vecown(v) vecown_(&(v))
-val_t vecown_(val_t *vp);
-
-val_t vecdisown_1_(val_t *vp)
-val_t vecdisown_2(val_t v, uint32_t i, int32_t delta)
-
-#define vecdisown_1(v) vecdisown_1_(&(v))
-
-val_t vecref(val_t v);
-
-#define vecunref(...) VEC_vrg(vecunref_,__VA_ARGS__)
-val_t vecunref_1(val_t v);
-val_t vecunref_2(val_t v,uint32_t i);
-
-#define valisref(x)       ((val(x).v & (VAL_VEC_MASK | 1)) == (VAL_VEC_MASK | 1))
-
-
-
-#ifndef NDEBUG
-  #define vecdbg(...) (fprintf(stderr,"      INFO|  "),fprintf(stderr, __VA_ARGS__),fprintf(stderr," [%s:%d]\n",__FILE__,__LINE__))
-#else
-  #define vecdbg(...)
-#endif
-#define vec_dbg(...)
-
-#ifdef VEC_MAIN
-#include "vec.c"
-#endif
+extern int64_t vecallocatedmem;
 
 #endif
