@@ -1,5 +1,5 @@
 #include "tst.h"
-#include "vec.h"
+#include "val.h"
 
 tstsuite("Array tests",nolarge) {
 

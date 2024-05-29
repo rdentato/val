@@ -2,9 +2,8 @@
 //  SPDX-License-Identifier: MIT
 
 #include "tst.h"
+#include "val.h"
 
-#define VEC_MAIN
-#include "vec.h"
 
 tstsuite("Stack tests",nolarge)
 {

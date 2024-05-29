@@ -34,4 +34,7 @@ tstsuite("Comparison Function `valeq`") {
     val_t str_val = val("42");
     tstcheck(!valeq(int_val, str_val), "Different types should not be equal");
   }
+
 }
+
+

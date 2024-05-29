@@ -3,8 +3,8 @@
 
 #include "tst.h"
 
-#define VEC_MAIN
-#include "vec.h"
+#include "val.h"
+
 
 tstsuite("Check owning reference") {
     val_t v = valnil;

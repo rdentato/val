@@ -6,7 +6,8 @@
 tstsuite("Constants") {
   val_t x;
   tstcase("predefined constants") {
-    tstcheck(valisconst(valnil),"x: 0x%08lX (0x%08lX)",valnil.v,(valnil.v & (uint64_t)0xFFFF000000000000) );
+    tstcheck(!valisconst(valnil),"x: 0x%08lX (0x%08lX)",valnil.v,(valnil.v & (uint64_t)0xFFFF000000000000) );
+    tstcheck(!valisconst(valtrue),"x: 0x%08lX (0x%08lX)",valnil.v,(valnil.v & (uint64_t)0xFFFF000000000000) );
   }
 
   tstcase("Constants (default group)") {

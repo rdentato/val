@@ -81,4 +81,9 @@ tstsuite("Basic val tests")
       tstcheck(valisinteger(y));
     }
 
+    tstcheck("Function pointer") {
+       val_t f = val(valcmp);
+       tstcheck(valispointer(f));
+    }
+
 }
