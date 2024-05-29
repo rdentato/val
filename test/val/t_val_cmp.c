@@ -9,36 +9,36 @@ tstsuite("Comparison Function `valcmp`") {
       a = val(3); b = val(3);
       tstcheck((cmp = valcmp(a,b)) == 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
       a = val(32); b = val(5);
-      tstcheck((cmp = valcmp(a,b)) == 1, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
+      tstcheck((cmp = valcmp(a,b)) > 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
       a = val(3); b = val(5);
-      tstcheck((cmp = valcmp(a,b)) == -1, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
+      tstcheck((cmp = valcmp(a,b)) < 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
     }
 
     tstcase("Two doubles") {
       a = val(3.14); b = val(3.14);
       tstcheck((cmp = valcmp(a,b)) == 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
       a = val(32.6); b = val(5.9);
-      tstcheck((cmp = valcmp(a,b)) == 1, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
+      tstcheck((cmp = valcmp(a,b)) > 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
       a = val(3.1); b = val(5.7);
-      tstcheck((cmp = valcmp(a,b)) == -1, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
+      tstcheck((cmp = valcmp(a,b)) < 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
     }
 
     tstcase("An integer and a double") {
       a = val(3); b = val(3.0);
       tstcheck((cmp = valcmp(a,b)) == 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
       a = val(3); b = val(2.4);
-      tstcheck((cmp = valcmp(a,b)) == 1, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
+      tstcheck((cmp = valcmp(a,b)) > 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
       a = val(3); b = val(5.7);
-      tstcheck((cmp = valcmp(a,b)) == -1, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
+      tstcheck((cmp = valcmp(a,b)) < 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
     }
 
     tstcase("A double and an integer") {
       a = val(3.0); b = val(3);
       tstcheck((cmp = valcmp(a,b)) == 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
       a = val(3.14); b = val(2);
-      tstcheck((cmp = valcmp(a,b)) == 1, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
+      tstcheck((cmp = valcmp(a,b)) > 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
       a = val(3.14); b = val(5);
-      tstcheck((cmp = valcmp(a,b)) == -1, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
+      tstcheck((cmp = valcmp(a,b)) < 0, "cmp: %d (a= %016lX b=%016lX)",cmp,a.v,b.v);
     }
 
     tstcase("Two strings") {

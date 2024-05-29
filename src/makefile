@@ -1,22 +1,38 @@
 #  SPDX-Creator-Person: Remo Dentato (rdentato@gmail.com)
 #  SPDX-License-Identifier: MIT
 
-CFLAGS= -g -DDEBUG -Wall -I./
-
-SRC=$(wildcard *.c)
+HDR=val_.h buf_.h vec_.h
+SRC_=$(wildcard *.c)
+SRC=${SRC_:all.c=}
 OBJ=$(SRC:.c=.o)
+AR=ar -r
+DSTR=../distr
+
+#CFLAGS= -O3 -DNDEBUG -Wall -I./ -I$(DSTR)
+CFLAGS= -O2 -DDEBUG -Wall -I./ -I$(DSTR)
+#CFLAGS= -pg -O2 -Wall -I./ -I$(DSTR)
+#CFLAGS= -g -Wall -I./ -I$(DSTR)
+
 
 # implicit rules
 MAKEFLAGS += --no-builtin-rules
 
 # targets
-all: $(OBJ)
+all: $(DSTR)/val.h $(DSTR)/libval.a
 
-%.o: %.c 
+$(DSTR)/libval.a:  $(HDR) $(OBJ) 
+	$(AR) $(DSTR)/libval.a $(OBJ)
+
+%.o: %.c $(DSTR)/val.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PRECIOUS: %.o
 
-clean:
-	rm -f $(OBJ) 
+$(DSTR)/val.h: $(HDR)
+	@echo "// `date`" > $(DSTR)/val.h
+	@for f in $(HDR); do echo "#line 1 \"$$f\""; cat $$f; done >> $(DSTR)/val.h
+	@echo "$(DSTR)/val.h created"
+
+clean: 
+	rm -f $(DSTR)/libval.a $(DSTR)/val.h $(OBJ)
 

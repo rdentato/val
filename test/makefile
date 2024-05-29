@@ -1,4 +1,4 @@
-TESTDIRS=val vec
+TESTDIRS=val vec buf
 
 all:
 	@echo "Test directories: $(TESTDIRS)"

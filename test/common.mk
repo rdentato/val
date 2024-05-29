@@ -10,8 +10,11 @@ STATIC=
 endif
 
 SRCDIR=../../src
+DSTR=../../distr
 
-CFLAGS=-g -DDEBUG -Wall -I$(SRCDIR) -I.. $(STATIC)
+CFLAGS= -O2 -DDEBUG -Wall -I$(DSTR) -I.. $(STATIC)
+#CFLAGS= -pg -O2 -Wall -I$(DSTR) -I.. $(STATIC)
+#CFLAGS= -g -Wall -I$(DSTR) -I.. $(STATIC)
 
 TESTS_SRC=$(wildcard t_*.c)
 TESTS=$(TESTS_SRC:.c=)
@@ -23,6 +26,7 @@ MAKEFLAGS += --no-builtin-rules
 all: objs $(TESTS)
 
 runtest: all
+
 	@../tstrun 
 
 objs:
@@ -31,8 +35,9 @@ objs:
 #%.o: %.c 
 #	$(CC) $(CFLAGS) -c $< -o $@
 
-%: %.c 
-	$(CC) $(CFLAGS) $< $(OBJ) -o $*
+%: %.c
+	cd $(SRCDIR) ; make
+	$(CC) $(CFLAGS) $< -o $* -L$(DSTR) -lval
 
 #.PRECIOUS: %.o
 
