@@ -4,15 +4,8 @@
 #include "vec_.h"
 #include <stdalign.h>
 
+#ifndef RETURN_IF
 #define RETURN_IF valreturnif
-
-#ifdef DEBUG
-int64_t vecallocatedmem = 0;
-#define add_mem(m) (vecallocatedmem += (m))
-#define sub_mem(m) (vecallocatedmem -= (m))
-#else 
-#define add_mem(m) ((void)0)
-#define sub_mem(m) ((void)0) 
 #endif
 
 #define VALS_PER_MAPNODE 4
@@ -75,7 +68,6 @@ val_t vecnew() {
   
   RETURN_IF(v == NULL, valnil, ENOMEM);
   
-  add_mem(sizeof(struct vec_s));
   memset(v,0,sizeof(struct vec_s));
   return val(v);
 }
@@ -98,9 +90,7 @@ static val_t vec_free(val_t vv)
   errno = 0;
   v = (vec_t)valtocleanpointer(vv); 
   //freevecs(v->vec,v->fst,v->end);
-  sub_mem(v->sze * sizeof(val_t));
   free(v->vec);
-  sub_mem(sizeof(struct vec_s));
   free(v); 
   return valnil;
 }
@@ -114,7 +104,7 @@ val_t vecfree(val_t vv) {
 }
 
 // Ensure the vector is large enough to store a value at index n
-static int makeroom(vec_t v, uint32_t n)
+static int vec_makeroom(vec_t v, uint32_t n)
 {
   uint32_t new_sze;
   val_t   *new_vec;
@@ -148,7 +138,7 @@ static int makeroom(vec_t v, uint32_t n)
   val_dbg("MKROOM: got(%p,%d) [%d]",new_vec,new_sze * sizeof(val_t),new_sze);
 
   RETURN_IF(new_vec == NULL,0,ENOMEM);
-  add_mem((new_sze - v->sze) * sizeof(val_t));
+
   // set the newly allocated area to 0;
   memset(&(new_vec[v->end]),0,(new_sze-v->sze)*sizeof(val_t));
 
@@ -189,7 +179,7 @@ int vec_gap_3(val_t vv, uint32_t i, uint32_t l)
     */
   }
   val_dbg("GAP end:%d i:%d l:%d n:%d",v->end,i,l,n);
-  if (!makeroom(v, n)) return 0;
+  if (!vec_makeroom(v, n)) return 0;
   if (i < v->end) {
     memmove(&(v->vec[i+l]),  &(v->vec[i]),  (v->end-i)*sizeof(val_t));
     memset(&(v->vec[i]),0, l * sizeof(val_t));
@@ -219,7 +209,7 @@ uint32_t vecsize_2(val_t vv, uint32_t n)
   errno = 0;
   RETURN_IF(!valisvec(vv),0,EINVAL); 
   v = (vec_t)valtovec(vv);
-  RETURN_IF(n != VECNONDX && !makeroom(v,n),0,ENOMEM);
+  RETURN_IF(n != VECNONDX && !vec_makeroom(v,n),0,ENOMEM);
   return v->sze;
 }
 
@@ -246,7 +236,7 @@ uint32_t veccount_2(val_t vv, uint32_t n)
 
   if (n != VECNONDX && (n < (VECMAXNDX - first)))  {
     n += first;
-    RETURN_IF(!makeroom(v, n ), 0, ENOMEM);
+    RETURN_IF(!vec_makeroom(v, n ), 0, ENOMEM);
     if (n > v->end) v->flg &= ~VEC_SORTED;
     v->end = n;
     if (v->fst > n) v->fst = n;
@@ -286,7 +276,7 @@ val_t vecset_(val_t vv, uint32_t i, val_t x)
 
   if (i == VECNONDX) i = v->end;
   
-  RETURN_IF(!makeroom(v,i), valerror, ENOMEM);
+  RETURN_IF(!vec_makeroom(v,i), valerror, ENOMEM);
 
   x=setval(v, i, x);
 
@@ -739,7 +729,7 @@ static uint32_t vec_newmapnode(vec_t v)
   vec_mapnode_t *node;
 
   newnode = v->end;
-  RETURN_IF(!makeroom(v, newnode+VALS_PER_MAPNODE), VECNONDX, ENOMEM);
+  RETURN_IF(!vec_makeroom(v, newnode+VALS_PER_MAPNODE), VECNONDX, ENOMEM);
   v->end += VALS_PER_MAPNODE;
   node = getnode(v,newnode);
 

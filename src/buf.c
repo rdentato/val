@@ -4,16 +4,8 @@
 #include "buf_.h"
 #include <stdalign.h>
 
+#ifndef RETURN_IF
 #define RETURN_IF valreturnif
-
-
-#ifdef DEBUG
-int64_t bufallocatedmem = 0;
-#define add_mem(m) (bufallocatedmem += (m))
-#define sub_mem(m) (bufallocatedmem -= (m))
-#else 
-#define add_mem(m) ((void)0)
-#define sub_mem(m) ((void)0) 
 #endif
 
 val_t buf_stores[BUF_STORES_NUM] = {valnil, valnil, valnil, valnil};
@@ -50,7 +42,7 @@ void bufclearstore_(int sto)
 }
 
 // Ensure the buftor is large enough to store a value at index n
-static int makeroom(buf_t b, uint32_t n)
+static int buf_makeroom(buf_t b, uint32_t n)
 {
   uint32_t new_sze;
   char *new_buf;
@@ -85,7 +77,7 @@ static int makeroom(buf_t b, uint32_t n)
   val_dbg("MKROOM: got(%p,%d) [%d]",new_buf,new_sze ,new_sze);
 
   RETURN_IF(new_buf == NULL,0,ENOMEM);
-  add_mem((new_sze - b->sze));
+
   // set the newly allocated area to 0;
   new_buf[b->end] = '\0';
 
@@ -103,11 +95,10 @@ val_t bufnew_(uint32_t sze) {
     b->end = 0;
     b->sze = sze;
     b->buf = NULL;
-    if (!makeroom(b,sze)) {free(b); b = NULL;}
+    if (!buf_makeroom(b,sze)) {free(b); b = NULL;}
   }
   RETURN_IF(b == NULL, valnil, ENOMEM);
   
-  add_mem(sizeof(struct buf_s));
   memset(b,0,sizeof(struct buf_s));
   return val(b);
 }
@@ -118,9 +109,8 @@ val_t buffree(val_t bb)
   errno = 0;
   RETURN_IF(!valisbuf(bb),bb,EINVAL);
   b = valtocleanpointer(bb); 
-  sub_mem(b->sze);
+
   free(b->buf);
-  sub_mem(sizeof(struct buf_s));
   free(b); 
   return valnil;
 }
@@ -157,7 +147,7 @@ uint32_t bufputs_3(val_t bb, const char *src, uint32_t len)
   if (len == 0) len = strlen(src);
   
   if (len > 0) {
-    RETURN_IF(!makeroom(b,b->pos+len), 0, ENOMEM);
+    RETURN_IF(!buf_makeroom(b,b->pos+len), 0, ENOMEM);
 
     memmove(b->buf + b->pos, src, len);
 
@@ -185,7 +175,7 @@ uint32_t bufprintf(val_t bb, const char *fmt, ...)
   va_end(args);
 
   if (len > 0) {
-    RETURN_IF(!makeroom(b,b->pos+len), 0, ENOMEM);
+    RETURN_IF(!buf_makeroom(b,b->pos+len), 0, ENOMEM);
     val_dbg("POS[end]: %d", b->buf[b->pos+len]);
     int oldend = b->buf[b->pos+len];
     va_start(args, fmt);
@@ -208,7 +198,7 @@ uint32_t bufsize_2(val_t bb, uint32_t sze)
   buf_t b = valtocleanpointer(bb);
 
   if (sze > b->sze) {
-    RETURN_IF(!makeroom(b,sze), 0, ENOMEM);
+    RETURN_IF(!buf_makeroom(b,sze), 0, ENOMEM);
     b->sze = sze;
   }
   return b->sze;
@@ -230,7 +220,7 @@ uint32_t buflen_2(val_t bb, uint32_t n)
   buf_t b = valtocleanpointer(bb);
 
   if (n < BUFMAXNDX) {
-    RETURN_IF(!makeroom(b,n), 0, ENOMEM);
+    RETURN_IF(!buf_makeroom(b,n), 0, ENOMEM);
     b->end = n;
     b->pos = b->end;
     b->buf[b->end] = '\0';
@@ -253,7 +243,7 @@ uint32_t bufload_3(val_t bb, uint32_t n, FILE *f)
   uint32_t l = 0;
   uint32_t r;
   while (!feof(f) && l <= n) {
-    RETURN_IF(!makeroom(b,b->pos+blksize), 0, ENOMEM);
+    RETURN_IF(!buf_makeroom(b,b->pos+blksize), 0, ENOMEM);
 
     r = fread(b->buf+b->pos,1,blksize,f);
     if (r == 0) break;
@@ -284,7 +274,7 @@ uint32_t bufloadln(val_t bb, FILE *f)
 
     if (c == '\n') break;
 
-    RETURN_IF(!makeroom(b,b->pos+32), 0, ENOMEM);
+    RETURN_IF(!buf_makeroom(b,b->pos+32), 0, ENOMEM);
 
     last_c = b->buf[b->pos];
     b->buf[b->pos] = c;
@@ -348,8 +338,8 @@ static int makegap(buf_t b, uint32_t l)
 {
   uint32_t i = b->pos;
 
-  valdbg("entering makegap(%d,%d)",i,l);
-  RETURN_IF(!makeroom(b, i+l),0,ENOMEM);
+  val_dbg("entering makegap(%d,%d)",i,l);
+  RETURN_IF(!buf_makeroom(b, i+l),0,ENOMEM);
 
   if (i < b->end) {
     /*                     __l__

@@ -8,7 +8,6 @@ tstsuite("Buffer creation tests",nolarge) {
   tstcase("Create & Destroy buffers") {
     tstcheck(!valisnil((b = bufnew())));
     tstcheck(valisnil((b = buffree(b))));
-    tstcheck(bufallocatedmem == 0);
     tstcheck(valisnil((b = buffree(b))));
   }
 

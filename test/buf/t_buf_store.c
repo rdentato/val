@@ -14,8 +14,10 @@ tstsuite("Buffer store") {
     tstcheck(valtostring(val(3))[0] == '\0');
   }
 
+  a = bufstore("pippo");
+  b = bufstore("pluto");
+
   tstcase("Default store") {
-    a = bufstore("pippo");
 
     tstcheck(valisstored(a));
     tstcheck(!valisbuf(a));
@@ -23,7 +25,6 @@ tstsuite("Buffer store") {
     tstcheck(valtointeger(a) == 4);
     tstcheck(strcmp(valtostring(a),"pippo") == 0)
 
-    b = bufstore("pluto");
     tstcheck(valisstored(b));
     tstcheck(!valisbuf(b));
     tstcheck((((uintptr_t)valtostring(b)) & 3) == 0,"ptr: %016lX",(((uintptr_t)valtostring(b))));

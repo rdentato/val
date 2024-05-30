@@ -18,7 +18,7 @@ CFLAGS= -O2 -DDEBUG -Wall -I./ -I$(DSTR)
 MAKEFLAGS += --no-builtin-rules
 
 # targets
-all: $(DSTR)/val.h $(DSTR)/libval.a
+all: $(DSTR)/val.h $(DSTR)/val.o $(DSTR)/libval.a
 
 $(DSTR)/libval.a:  $(HDR) $(OBJ) 
 	$(AR) $(DSTR)/libval.a $(OBJ)
@@ -32,6 +32,15 @@ $(DSTR)/val.h: $(HDR)
 	@echo "// `date`" > $(DSTR)/val.h
 	@for f in $(HDR); do echo "#line 1 \"$$f\""; cat $$f; done >> $(DSTR)/val.h
 	@echo "$(DSTR)/val.h created"
+
+$(DSTR)/val.c: $(HDR)
+	@echo "// `date`" > $(DSTR)/val.c
+	@for f in $(SRC); do echo "#line 1 \"$$f\""; cat $$f; done >> $(DSTR)/val.c
+	@echo "$(DSTR)/val.c created"
+
+
+$(DSTR)/val.o: $(DSTR)/val.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean: 
 	rm -f $(DSTR)/libval.a $(DSTR)/val.h $(OBJ)

@@ -699,8 +699,9 @@ static inline val_t vecfirst_2_(val_t v, val_t dd) {
     if (kptr == NULL) kptr = &k;
     return vecmapfirst_(v, kptr);
   }
-  uint32_t d = 0;
+  int32_t d = 0;
   if (valisinteger(dd)) d = valtointeger(dd);
+  val_dbg("d: %d",d);
   return vecget_2(v,vecindex_3(v,VECFIRSTNDX,d)); 
 }
 

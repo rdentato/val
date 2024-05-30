@@ -70,9 +70,9 @@ tstsuite("Queue test cases",nolarge)
       tstcheck(valtointeger(vecenq(v,300)) == 300);
       tstcheck(veccount(v) == 3,"Expected 3 got %d",veccount(v));
 
-      tstcheck(valeq((x=vecfirst(v)),100), "got: %016lX",x.v); 
+      tstcheck(valeq((x=vecfirst(v)),100), "got: %016lX [%016lX]",x.v,val(100).v); 
 
-      tstcheck(valeq((x=vecfirst(v,-1)),200), "got: %016lX",x.v); 
+      tstcheck(valeq((x=vecfirst(v,-1)),200), "got: %016lX [%016lX]",x.v,val(-1).v); 
       tstcheck(valeq((x=vecfirst(v,1)),200), "got: %016lX",x.v); 
 
       tstcheck(valeq((x=vecfirst(v,-2)),300), "got: %016lX",x.v); 
