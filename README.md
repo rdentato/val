@@ -85,7 +85,7 @@ int main(void) {
     printf("signed: %lld\n", (long long)valtosignedint(i));
     printf("unsigned: %llu\n", (unsigned long long)valtounsignedint(u));
     printf("bool: %s\n", valtobool(b) ? "true" : "false");
-    printf("string: %s\n", (char *)val_topointer(s));
+    printf("string: %s\n", (char *)valtopointer(s));
 
     // Comparison
     val_t x = val(10);
