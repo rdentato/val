@@ -1,14 +1,15 @@
-//  SPDX-FileCopyrightText: © 2023 Remo Dentato <rdentato@gmail.com>
+//  SPDX-FileCopyrightText: © 2025 Remo Dentato <rdentato@gmail.com>
 //  SPDX-License-Identifier: MIT
-//  PackageVersion: 0.1.0 Beta
+//  PackageVersion: 0.3.0 Beta
 
 #ifndef VAL_VERSION
-#define VAL_VERSION 0x0001000B
+#define VAL_VERSION 0x0003000B
 
-#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdlib.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <assert.h>
 
 // ## REFERENCES
 //
@@ -21,160 +22,297 @@
 // Nanobox implementation by Viktor Söderqvist 
 // https://github.com/zuiderkwast/nanbox/blob/master/nanbox.h
 //
-// Intel® 64 and IA-32 Architectures Software Developer’s Manual vol 1.
-// https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol1/o_7281d5ea06a5b67a.html
-// (see table 4.3 on pages 90)
+// Intel® 64 and IA-32 Architectures Software Developer’s Manual vol 1 §4.2.2 table 4-3
+// https://cdrdv2.intel.com/v1/dl/getContent/671436
+//
 
+// We use Quiet NaN's (i.e. no trap or exception will be triggered: IEEE 754-2019 § 6.2.1)
+// The tag that identifies which type the payload is, uses 4 bits:
+//
 //                  ╭─── Quiet NaN
-//                  │╭── QNaN Floating-Point Indefinites has 0 fron here up to the end
-//                  ▼▼ 
+//                  ▼
 //   x111 1111 1111 1xxx FF FF FF FF FF FF
-//    ╰──────┬──────╯    ╰───────┬───────╯
+//   │╰──────┬──────╯╰┬╯ ╰───────┬───────╯
+//  tag      │       tag         │ 
 //           │                   │ 
 //    12 bits set to 1   Payload (48 bits)
 //          7FF8
+//
+//  The value "Quiet NaN Indefinite" which is the value returend by invalid operations like
+//  0/0, is usually 0xFFF8000000000000 (that's the case both for Intel and ARM 64 bits processors).
+//  This library never uses or generates this value to avoid conflicts. This is not a guarantee as
+//  the IEEE standard only requires that a NaN is produced, but works well for most modern computers.
 
 typedef struct {uint64_t v;} val_t;
-typedef struct {val_t v;} val_owner_t;
-typedef struct {char *s;} chs_t;
-typedef struct vec_s *vec_t;
 
-typedef struct val_blk_s {
-  void *dta;
-  uint32_t sze;
-  uint32_t cnt;
-} val_blk_t;
+static_assert(sizeof(val_t) == sizeof(uint64_t));
+static_assert(sizeof(val_t) == 8);
 
+// Only used in conjunction with vec.h. Assumes that the first field in the struct
+// is a pointer to the buffer (as it is the case for `struct vec_s` in vec.h) so 
+// that the C11 standard (§6.3.2.3) ensure we can convert from a pointer to the 
+// structure to a pointer its first element. Only used in valcmp() and valhash().
+// If you're using val.h as a standalone library, just ignore the following line.
+typedef struct val_buf_s *val_buf_t;
 
-// Some bitmask
-#define VAL_TYPE_MASK ((uint64_t)0xFFFF000000000000)
-#define VAL_NAN_MASK  ((uint64_t)0x7FF0000000000000)
-#define VAL_PAYLOAD   ((uint64_t)0x0000FFFFFFFFFFFF)
-#define VAL_PTR_MASK  ((uint64_t)0xFFFD000000000000)
-#define VAL_VEC_MASK  ((uint64_t)0xFFFE000000000000)
-#define VAL_BLK_MASK  ((uint64_t)0xFFFC000000000000)
-#define VAL_STR_MASK  ((uint64_t)0xFFFF000000000000)
-#define VAL_INT_MASK  ((uint64_t)0x7FFF000000000000)
-#define VAL_UNS_MASK  ((uint64_t)0x7FFE000000000000)
-#define VAL_CST_MASK  ((uint64_t)0xFFF8FFFFFFFFFF00)
-#define VAL_BOL_MASK  ((uint64_t)0xFFF8FFFFFFFFFF00)
-
-// Check the type of a val_t variable
-#define valisinteger(x) ((val(x).v & (uint64_t)0xFFFE000000000000) == VAL_UNS_MASK)
-#define valissigned(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_INT_MASK)
-#define valisbool(x)    ((val(x).v & (uint64_t)0xFFFFFFFFFFFFFFFE) == VAL_BOL_MASK )
+// ==== FLOATING POINT DOUBLES
+// A value v is NaN-boxed if  (v & VAL_NAN_MASK) == VAL_NAN_MASK
+// Otherwise is a double (i.e. is not a NaN).
 #define valisdouble(x)  ((val(x).v & VAL_NAN_MASK) != VAL_NAN_MASK)
-#define valispointer(x) ((val(x).v & VAL_TYPE_MASK) == VAL_PTR_MASK)
-#define valisstring(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_STR_MASK)
-#define valisvec(x)     ((val(x).v & VAL_TYPE_MASK) == VAL_VEC_MASK)
 
-#define valeq(x,y)      (val(x).v == val(y).v)
+#define VAL_NAN_MASK      ((uint64_t)0x7FF8000000000000)
+#define VAL_TAG_MASK      ((uint64_t)0xFFFF000000000000)
+#define VAL_PAYLOAD_MASK  ((uint64_t)0x0000FFFFFFFFFFFF)
 
-#define valisnil(x)     valeq(x,valnil)
-#define valiszero(x)    ((val(x).v & VAL_PAYLOAD) == 0)
+// ==== INTEGERS 
+#define VAL_UINT_48       ((uint64_t)0xFFFE000000000000)
+#define VAL_INT_48        ((uint64_t)0xFFFF000000000000)
+#define VAL_INT_SIGN      ((uint64_t)0x0001800000000000)
 
-// Store a value into a val_t variable
-static inline val_t val_fromchar(char v)             {val_t ret; ret.v = VAL_INT_MASK | ((uint64_t)v);                  return ret;}
-static inline val_t val_fromuchar(unsigned char v)   {val_t ret; ret.v = VAL_UNS_MASK | ((uint64_t)v);                  return ret;}
-static inline val_t val_fromint(int v)               {val_t ret; ret.v = VAL_INT_MASK | ((uint64_t)v);                  return ret;}
-static inline val_t val_fromuint(unsigned int v)     {val_t ret; ret.v = VAL_UNS_MASK | ((uint64_t)v);                  return ret;}
-static inline val_t val_fromshort(short v)           {val_t ret; ret.v = VAL_INT_MASK | ((uint64_t)v);                  return ret;}
-static inline val_t val_fromushort(unsigned short v) {val_t ret; ret.v = VAL_UNS_MASK | ((uint64_t)v);                  return ret;}
-static inline val_t val_fromlong(long v)             {val_t ret; ret.v = VAL_INT_MASK | ((uint64_t)(v) & VAL_PAYLOAD);  return ret;}
-static inline val_t val_fromulong(unsigned long v)   {val_t ret; ret.v = VAL_UNS_MASK | ((uint64_t)(v) & VAL_PAYLOAD);  return ret;}
-static inline val_t val_frombool(_Bool v)            {val_t ret; ret.v = VAL_BOL_MASK | ((uint64_t)((v) & 1));          return ret;}
-static inline val_t val_fromptr(void *v)             {val_t ret; ret.v = VAL_PTR_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
-static inline val_t val_fromstr(void *v)             {val_t ret; ret.v = VAL_STR_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
-static inline val_t val_fromvec(void *v)             {val_t ret; ret.v = VAL_VEC_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
-static inline val_t val_fromblk(void *v)             {val_t ret; ret.v = VAL_BLK_MASK | ((uintptr_t)(v) & VAL_PAYLOAD); return ret;}
+#define valissignedint(x)    ((val(x).v & VAL_TAG_MASK) == VAL_INT_48)
+#define valisunsignedint(x)  ((val(x).v & VAL_TAG_MASK) == VAL_UINT_48)
 
-static inline val_t val_fromdouble(double v)         {val_t ret; memcpy(&ret,&v,sizeof(val_t)); return ret;}
-static inline val_t val_fromfloat(float f)           {return val_fromdouble((double)f);}
+// ==== POINTERS
+#define VAL_PTR_MASK      ((uint64_t)0xFFF8000000000000)
+#define VAL_VOIDPTR       ((uint64_t)0x7FF8000000000000)
+#define VAL_CHARPTR       ((uint64_t)0x7FF9000000000000)
+#define VAL_BUFPTR        ((uint64_t)0x7FFA000000000000)
 
-static inline val_t val_fromvalowner(val_owner_t v)  {val_t ret; ret.v = (v.v.v) & (uint64_t)0xFFFFFFFFFFFFFFFE; return ret;}
-static inline val_t val_fromval(val_t v)             {return v;}
+// This is reserved for future expansions.
+#define VAL_PTRTAG_5      ((uint64_t)0x7FFB000000000000)
+#ifndef valpointer_5_t
+typedef struct valpointer_5_s {int x;} *valpointer_5_t; 
+#endif
 
-#define val_(x) _Generic((x), int: val_fromint,    \
-                             char: val_fromchar,   \
-                            short: val_fromshort,  \
-                             long: val_fromlong,   \
-                            _Bool: val_frombool,   \
-                     unsigned int: val_fromuint,   \
-                    unsigned char: val_fromuchar,  \
-                   unsigned short: val_fromushort, \
-                    unsigned long: val_fromulong,  \
-                           double: val_fromdouble, \
-                            float: val_fromfloat,  \
-                            val_t: val_fromval,    \
-                      val_owner_t: val_fromvalowner,\
-                            vec_t: val_fromvec,    \
-                        val_blk_t: val_fromblk,    \
-                  unsigned char *: val_fromstr,    \
-                           char *: val_fromstr,    \
-                           void *: val_fromptr) (x)
+// These can be user defined.
+#define VAL_PTRTAG_4      ((uint64_t)0x7FFC000000000000)
+#define VAL_PTRTAG_3      ((uint64_t)0x7FFD000000000000)
+#define VAL_PTRTAG_2      ((uint64_t)0x7FFE000000000000)
+#define VAL_PTRTAG_1      ((uint64_t)0x7FFF000000000000)
 
+#ifndef valpointer_4_t
+typedef struct valpointer_4_s {int x;} *valpointer_4_t; 
+#endif
+#ifndef valpointer_3_t
+typedef struct valpointer_3_s {int x;} *valpointer_3_t; 
+#endif
+#ifndef valpointer_2_t
+typedef struct valpointer_2_s {int x;} *valpointer_2_t; 
+#endif
+#ifndef valpointer_1_t
+typedef struct valpointer_1_s {int x;} *valpointer_1_t; 
+#endif
+
+// Any pointer will succeed, regardless the tag
+#define valispointer(x)  ((val(x).v & VAL_PTR_MASK)  == VAL_VOIDPTR)
+
+#define valischarptr(x)  ((val(x).v & VAL_TAG_MASK) == VAL_CHARPTR)
+#define valisbufptr(x)   ((val(x).v & VAL_TAG_MASK) == VAL_BUFPTR)
+
+// ==== CONSTANTS
+#define VAL_CONST_MASK    ((uint64_t)0xFFFFFFFF00000000)
+#define VAL_CONST_0       ((uint64_t)0xFFF8000F00000000)
+#define VAL_BOOL          ((uint64_t)0xFFF8FFFF00000000)
+#define VAL_32BIT_MASK    ((uint64_t)0x00000000FFFFFFFF)
+
+// Booleans
+#define valfalse        ((val_t){VAL_BOOL })
+#define valtrue         ((val_t){VAL_BOOL | 1})
+#define valisboolean(x) ((val(x).v & VAL_CONST_MASK) == VAL_BOOL)
+
+
+// A nil value to signal a void value
+#define VAL_NIL     ((uint64_t)0xFFF800FF00000000)
+static const val_t valnil = {VAL_NIL};
+#define valisnil(x)     ((val(x).v == VAL_NIL))
+
+// The val_t corresponding of the C pointer NULL
+static const val_t valnullptr = (val_t){VAL_VOIDPTR};
+#define valisnullptr(x)  (val(x).v  == VAL_VOIDPTR)
+
+// User defined constants
+#define valconst(x) ((val_t){ VAL_CONST_0 | ((x) & VAL_32BIT_MASK)})
+#define valisconst(x)   ((val(x).v & VAL_CONST_MASK) == VAL_CONST_0)
+
+// Convert a C value to a val_t
+// Note that these functions return a structure (NOT a pointer).
+
+// We only store floating point numbers as doubles since it is guaranteed by the
+// C Standard (C11/C17 § 6.3.1.5 [Real floating types]), that any float (4-byte
+// floating point real number) can be exactly represented as a double (8 bytes number).
+
+static inline val_t val_fromdouble(double v)    {val_t ret = valnil; memcpy(&ret,&v,sizeof(val_t)); return ret;}
+static inline val_t val_fromfloat(float f)      {return val_fromdouble((double)f);}
+
+static inline val_t val_frompvoidtr(void *v)    {val_t ret; ret.v = VAL_VOIDPTR  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromcharptr(void *v)    {val_t ret; ret.v = VAL_CHARPTR  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_frombufptr(void *v)     {val_t ret; ret.v = VAL_BUFPTR   | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_5(void *v)      {val_t ret; ret.v = VAL_PTRTAG_5 | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_4(void *v)      {val_t ret; ret.v = VAL_PTRTAG_4 | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_3(void *v)      {val_t ret; ret.v = VAL_PTRTAG_3 | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_2(void *v)      {val_t ret; ret.v = VAL_PTRTAG_2 | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_1(void *v)      {val_t ret; ret.v = VAL_PTRTAG_1 | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+
+static inline val_t val_frombool(_Bool v)       {val_t ret; ret.v = VAL_BOOL | ((uint64_t)((v) & 1)); return ret;}
+
+static inline val_t val_fromint(int64_t v)      {val_t ret; ret.v = VAL_INT_48  | ((v) & VAL_PAYLOAD_MASK);  return ret;}
+static inline val_t val_fromuint(uint64_t v)    {val_t ret; ret.v = VAL_UINT_48 | ((v) & VAL_PAYLOAD_MASK);  return ret;}
+
+static inline val_t val_fromval(val_t v)        {return v;}
+
+#define val_(x) _Generic((x), int: val_fromint,     \
+                             char: val_fromint,     \
+                            short: val_fromint,     \
+                             long: val_fromint,     \
+                        long long: val_fromint,     \
+                     unsigned int: val_fromuint,    \
+                    unsigned char: val_fromuint,    \
+                   unsigned short: val_fromuint,    \
+                    unsigned long: val_fromuint,    \
+               unsigned long long: val_fromuint,    \
+                            _Bool: val_frombool,    \
+                           double: val_fromdouble,  \
+                            float: val_fromfloat,   \
+                           void *: val_frompvoidtr, \
+                  unsigned char *: val_fromcharptr, \
+                    signed char *: val_fromcharptr, \
+                           char *: val_fromcharptr, \
+                        val_buf_t: val_frombufptr,  \
+                   valpointer_5_t: val_fromptr_5,   \
+                   valpointer_4_t: val_fromptr_4,   \
+                   valpointer_3_t: val_fromptr_3,   \
+                   valpointer_2_t: val_fromptr_2,   \
+                   valpointer_1_t: val_fromptr_1,   \
+                            val_t: val_fromval  ,   \
+                          default: val_frompvoidtr  \
+                          ) (x)
+
+// The C11 standard (§6.5.1.1) guarantess that x is only evaluated once.
+// The first occurence will not be evaluated as only its type is considered
+// and then only one of the branches are included in the translation unit.
+// This improves performance as val_t values pass through val() with no computation.
 #define val(x) _Generic((x), val_t: x, default: val_(x))
 
-// Retrieve a value from a val_t variable
-#define valtodouble(v) val_todouble(val(v))
-static inline   double val_todouble(val_t v)  { double d; memcpy(&d,&v,8); return d;}
-
-#define valtofloat(v) val_tofloat(val(v))
-static inline  float  val_tofloat(val_t v)    { return (float)val_todouble(v);}
-
+// ====== Retrieve values from a val_t variable
 #define valtobool(v) val_tobool(val(v))
-static inline  _Bool val_tobool(val_t v)      { return (_Bool)((v.v)&1);}
+static inline  _Bool val_tobool(val_t v)  {return ((v.v & VAL_32BIT_MASK) != 0);}
 
-#define VAL_SIGNED_MASK ((uint64_t)0x0001800000000000)
-#define valtointeger(x) val_tointeger(val(x))
-static inline      long val_tointeger(val_t v) \
-                                  { long ret = ((v.v) & VAL_PAYLOAD); 
-                                    if ( ((v.v) & VAL_SIGNED_MASK) == VAL_SIGNED_MASK) // if signed and negative
-                                       ret |= (uint64_t)0xFFFF000000000000;            // then extend sign
-                                    return ret;
-                                  }
+static inline uint64_t val_tounsignedint(val_t v);
+static inline int64_t val_tosignedint(val_t v);
 
-static inline   void *val_topointer(val_t v, uint64_t mask) { return (void *)((uintptr_t)((v.v) & mask));}
+#define valtodouble(v) val_todouble(val(v))
+static inline double val_todouble(val_t v)  
+{
+  double d=0.0;
+       if (valisdouble(v))  memcpy(&d,&v,sizeof(double)); 
+  else if (valissignedint(v)) d = (double)val_tosignedint(v);
+  else if (valisunsignedint(v)) d = (double)val_tounsignedint(v);
+  return d;
+}
 
-#define val_to_pointer(v_, m_) ((void *)((uintptr_t)((val(v_).v) & (m_))))
-#define valtopointer(v) val_to_pointer(v,VAL_PAYLOAD)
-#define valtostring(v) ((char *)valtopointer(v))
-#define valtovec(v)    ((vec_t)val_to_pointer(v,((uint64_t)0x0000FFFFFFFFFFFE)))
-#define valtoblk(v)    ((blk_t)val_to_pointer(v,((uint64_t)0x0000FFFFFFFFFFFE)))
+#define valtosignedint(v)  val_tosignedint(val(v))
+static inline int64_t val_tosignedint(val_t v)
+{ int64_t ret = 0;
+  if (valissignedint(v)) {
+    ret =((v.v) & VAL_PAYLOAD_MASK); 
+    ret |= ((v.v & VAL_INT_SIGN) == VAL_INT_SIGN) ? (uint64_t)0xFFFF000000000000 : (uint64_t)0x0;
+  }
+  else if (valisunsignedint(v))  ret = (int64_t)val_tounsignedint(v); 
+  else if (valisdouble(v)) ret = (int64_t)val_todouble(v);
+  return ret;
+}
 
-// Some constant
-#define valfalse      ((val_t){0xFFF8FFFFFFFFFF00})
-#define valtrue       ((val_t){0xFFF8FFFFFFFFFF01})
-#define valnil        ((val_t){0xFFF80FFFFFFFFFE0})
-#define valundefined  ((val_t){0xFFF80FFFFFFFFFD0})
-#define valdeleted    ((val_t){0xFFF80FFFFFFFFFC0})
-#define valempty      ((val_t){0xFFF80FFFFFFFFFB0})
-#define valmarked     ((val_t){0xFFF80FFFFFFFFFE1})
-#define valnilpointer ((val_t){0xFFFD000000000000})
+#define valtounsignedint(v)  val_tounsignedint(val(v))
+static inline uint64_t val_tounsignedint(val_t v) {
+  uint64_t ret = 0;
+  if (valisunsignedint(v))     ret = (v.v & VAL_PAYLOAD_MASK);
+  else if (valissignedint(v))  ret = (int64_t)(v.v & VAL_PAYLOAD_MASK);
+  else if (valisdouble(v))     ret = (uint64_t)val_todouble(v);
+  return ret;
+}
 
-#define valconst(x)   ((val_t){0xFFF8000000000000 | (uint32_t)(x)})
-#define valisconst(x) ((val(x).v & (uint64_t)0xFFFFFFFF00000000) == ((uint64_y)0xFFF800000000000))
+#define valtopointer(v) val_topointer(val(v))
+static inline   void *val_topointer(val_t v) {return (void *)((uintptr_t)((v.v) & VAL_PAYLOAD_MASK));}
 
-#define valnilstr   val_nilstr()
-static inline val_t val_nilstr() {static char *s=""; return val_fromstr(s);}
+#define valpointertag(v) val_pointertag(val(v))
+static inline int val_pointertag(val_t v) 
+{
+  uint64_t ret = 0;
+  if (valispointer(v)) {
+    ret = (v.v) & VAL_TAG_MASK;
+    ret = 0x07 - ((ret >> 48) & 0x07);
+    ret = ret + 1;
+  }
+  return ret ;
+}
 
-#define VALDOUBLE   1
-#define VALINTEGER  2
-#define VALBOOL     3
-#define VALNIL      4
-#define VALPOINTER  5
-#define VALSTRING   6
-#define VALVEC      7
+// This checks for val_t values IDENTITY
+#define valeq(x,y) (val(x).v == val(y).v)
 
-static inline int valtype(val_t v) {
-  if (valisdouble(v))  return VALDOUBLE;
-  if (valisinteger(v)) return VALINTEGER;
-  if (valisbool(v))    return VALBOOL;
-  if (valisnil(v))     return VALNIL;
-  if (valispointer(v)) return VALPOINTER;
-  if (valisstring(v))  return VALSTRING;
-  if (valisvec(v))     return VALVEC;
-  return 0;
+// This compares two val_t values. LIke the hash function below, It is provide just for convenience 
+// since your criteria for comparison and hashing might be different.
+#define valcmp(a,b) val_cmp(val(a),val(b))
+static inline int val_cmp(val_t a, val_t b)
+{
+  char *sa = NULL, *sb = NULL;
+  
+       if (valischarptr(a)) sa = valtopointer(a);
+  else if (valisbufptr(a) && ((sa = valtopointer(a)) != NULL)) sa = *((char **)sa);
+
+  if (sa) {
+         if (valischarptr(b)) sb = valtopointer(b);
+    else if (valisbufptr(b) && ((sb = valtopointer(b)) != NULL)) sb = *((char **)sb);
+  }
+
+  if (sb) return strcmp(sa,sb);
+  
+  double da = 0.0,  db = 0.0;
+  int    is_da = 0, is_db = 0;
+  
+  // We compare all numbers as floating points value. This works because a 48-bit integer can
+  // be exactly represented by a double (IEEE 754-2019 §6.2.6 and §3.2.2)
+       if ((is_da = valisdouble(a)))      da = valtodouble(a);
+  else if ((is_da = valissignedint(a)))   da = (double)valtosignedint(a);
+  else if ((is_da = valisunsignedint(a))) da = (double)valtounsignedint(a);
+
+  if (is_da) {
+         if ((is_db = valisdouble(b)))      db = valtodouble(b);
+    else if ((is_db = valissignedint(b)))   db = (double)valtosignedint(b);
+    else if ((is_db = valisunsignedint(b))) db = (double)valtounsignedint(b);
+
+    if (is_db) return (da > db)? 1 : (da < db) ? -1 : 0 ;
+  }
+
+  return (a.v > b.v)? 1 : (a.v < b.v) ? -1 : 0 ;
+}
+
+#define valhash(a) val_hash(val(a))
+static inline uint32_t val_hash(val_t v)
+{
+  uint32_t hash = (uint32_t)0x811c9dc5; // FNV1a INIT
+  char *s = NULL;
+
+       if (valischarptr(v)) s = valtopointer(v);
+  else if (valisbufptr(v) && ((s = valtopointer(v)) != NULL)) s = *(char **)s;
+  if (s) {
+    // FNV1a abridged from http://www.isthe.com/chongo/tech/comp/fnv/index.html
+    while (*s) {
+      hash ^= (uint32_t)(*s++);
+      hash *= (uint32_t)0x01000193; // FNV1a PRIME
+    }
+  }
+  else {
+    uint64_t h = v.v;
+    /* 64→64-bit MurmurHash3 “fmix” finalizer */
+    h ^= h >> 33;
+    h *= (uint64_t)0xff51afd7ed558ccd;
+    h ^= h >> 33;
+    h *= (uint64_t)0xc4ceb9fe1a85ec53;
+    h ^= h >> 33;
+
+    hash = (uint32_t)(h >> 32);
+  }
+  return hash;
 }
 
 #endif
