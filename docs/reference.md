@@ -81,13 +81,4 @@ All these constants are guaranteed to be different from any other val_t value.
 #include "val.h"
 ```
 
-## Define Custom Constants
-
-```c
-#define notfound valconst(1)
-#define end_of_list valconst(2)
-// Custom constant functions
-if (valeq(value, notfound)) { /* handle not found */ }
-```
-
 **Remember:** All val functions automatically convert their arguments to val_t!
