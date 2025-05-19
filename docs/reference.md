@@ -5,17 +5,10 @@
 | Function | Description |
 |----------|-------------|
 | `val(x)` | Create a val_t from any supported C type (auto-selects conversion method) |
-| `val_fromdouble(d)` | Create a val_t from a double |
-| `val_fromfloat(f)` | Create a val_t from a float |
-| `val_fromint(i)` | Create a val_t from a signed integer |
-| `val_fromuint(u)` | Create a val_t from an unsigned integer |
-| `val_frombool(b)` | Create a val_t from a boolean |
-| `val_frompvoidtr(ptr)` | Create a val_t from a void pointer |
-| `val_fromcharptr(str)` | Create a val_t from a character pointer (string) |
-| `val_frombufptr(buf)` | Create a val_t from a buffer pointer |
-| `val_fromptr_0-4(ptr)` | Create a val_t from a custom pointer (types 0-4) |
 
-## Predefined Constants
+## Constants
+
+### Predefined Constants
 
 | Constant | Description |
 |----------|-------------|
@@ -24,6 +17,18 @@
 | `valnil` | Nil/null value |
 | `valnullptr` | Null pointer value |
 | `valconst(n)` | Create a custom constant with value n |
+
+### User Defined Constants
+Custom constants can be defined using the `valconst()` macro with a 32 bits numeric identifier:
+
+```c
+// Define application-specific special values
+#define notfound    valconst(1)
+#define end_of_list valconst(2)
+#define retry       valconst(3)
+#define not_ready   valconst(4)
+```
+All these constants are guaranteed to be different from any other val_t value.
 
 ## Type Checking
 
@@ -38,7 +43,6 @@
 | `valisconst(v)` | Check if value is a custom constant |
 | `valispointer(v)` | Check if value is any pointer type |
 | `valischarptr(v)` | Check if value is a character pointer |
-| `valisbufptr(v)` | Check if value is a buffer pointer |
 | `valisnullptr(v)` | Check if value is a null pointer |
 
 ## Value Extraction
@@ -66,20 +70,6 @@
 - Only lower 48 bits of pointers stored
 - All values consume exactly 8 bytes
 
-## Types Overview
-
-| Type | Bit Pattern |
-|------|-------------|
-| Double | [IEEE-754 double that's not a NaN] |
-| Signed Int | 0x7FFF000000000000 | [48-bit value] |
-| Unsigned Int | 0x7FFE000000000000 | [48-bit value] |
-| Boolean | 0x7FF8FFFF0000000[0/1] |
-| Nil | 0x7FF800FF00000000 |
-| Custom Constant | 0x7FF8000F00000000 | [32-bit ID] |
-| Void Pointer | 0xFFF8000000000000 | [48-bit address] |
-| Char Pointer | 0xFFF9000000000000 | [48-bit address] |
-| Buffer Pointer | 0xFFFA000000000000 | [48-bit address] |
-| Custom Pointer 0-4 | 0xFFFF-0xFFFB000000000000 | [48-bit address] |
 
 ## Define Custom Pointer Types
 
