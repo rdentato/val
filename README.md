@@ -21,16 +21,16 @@ All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 * **Generic constructors**:
 
   ```c
-  val_t v1 = val_fromdouble(3.14);
-  val_t v2 = val_fromint(-42);
-  val_t v3 = val_fromcharptr("hello");
+  val_t v1 = val(3.14);     // A double
+  val_t v2 = val(-42);      // A signed integer
+  val_t v3 = val("hello");  // A string
   ```
 * **Generic extractor**:
 
   ```c
-  double d = valtodouble(v1);
+  double d  = valtodouble(v1);
   int64_t i = valtosignedint(v2);
-  char *s = (char *)val_topointer(v3);
+  char *s   = valtopointer(v3);
   ```
 * **Comparison & hashing**:
 
@@ -67,11 +67,11 @@ No build steps required.
 
 int main(void) {
     // Create various values
-    val_t d = val_fromdouble(2.71828);
-    val_t i = val_fromint(-12345);
-    val_t u = val_fromuint(12345);
-    val_t b = val_frombool(true);
-    val_t s = val_fromcharptr("NaN-boxing");
+    val_t d = val(2.71828);
+    val_t i = val(-12345);
+    val_t u = val((unsigned int)12345);
+    val_t b = val((_Bool)true);
+    val_t s = val("NaN-boxing");
 
     // Type checks
     assert(valisdouble(d));
@@ -88,9 +88,10 @@ int main(void) {
     printf("string: %s\n", (char *)val_topointer(s));
 
     // Comparison
-    val_t x = val_fromint(10);
-    val_t y = val_fromint(20);
-    printf("cmp(x,y) = %d\n", valcmp(x,y));  // –1
+    val_t x = val(10);
+    val_t y = val(20);
+    printf("cmp(x,y)  = %d\n", valcmp(x,y));   // –1
+    printf("cmp(x,10) = %d\n", valcmp(x,10));  // 0
     
     // Hashing
     printf("hash(\"NaN-boxing\") = 0x%x\n", valhash(s));
