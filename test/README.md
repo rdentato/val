@@ -1,4 +1,3 @@
-```markdown
 # Test Directory
 
 This directory contains all of the unit and integration tests for the project. Each test source file follows the naming convention:
@@ -99,4 +98,5 @@ Each test executable should return:
 
 Make’s `runtest` target will stop and report which test failed if any return a non-zero exit code.
 
+---
 
