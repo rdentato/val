@@ -3,14 +3,14 @@
 This directory contains all of the unit and integration tests for the project. Each test source file follows the naming convention:
 
 ```
-t\_\*.c
+t_<name>.c
 
 ```
 
 When you run `make t_<name>`, the `t_<name>.c` file is compiled into a corresponding test executable:
 
 ```
-t\_<name>
+t_<name>
 
 ````
 
