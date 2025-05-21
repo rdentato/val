@@ -12,9 +12,6 @@
 // Define custom constants
 #define notfound valconst(1)
 #define end_of_list valconst(2)
-#define operation_failed valconst(3)
-#define custom_success valconst(4)
-#define custom_error valconst(5)
 
 tstsuite("Val Library Value Extraction", value_extraction) {
     tstcase("Numeric Value Extraction") {
