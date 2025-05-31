@@ -70,8 +70,8 @@ tstsuite("Val Library Value Extraction", value_extraction) {
         
         tstsection("Pointer Tag Extraction") {
             // Assuming pointer types are tagged based on their defined order
-            tstcheck(valpointertag(charPtrVal) == 7, "Char pointer should have tag 7, (%d)",valpointertag(charPtrVal));
-            tstcheck(valpointertag(ptrVal) == 8, "Generic pointer should have tag 8, (%d)",valpointertag(ptrVal));
+            tstcheck(valpointertag(charPtrVal) == VAL_PTRTAG_CHAR, "Char pointer should have tag %016lX, (%016lX)",VAL_PTRTAG_CHAR,valpointertag(charPtrVal));
+            tstcheck(valpointertag(ptrVal) == VAL_PTRTAG_VOID, "Generic pointer should have tag %016lX, (%016lX)",VAL_PTRTAG_VOID,valpointertag(ptrVal));
         }
         
         free(ptr);

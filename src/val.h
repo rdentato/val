@@ -74,9 +74,9 @@ typedef struct val_buf_s *val_buf_t;
 
 // ==== POINTERS
 #define VAL_PTR_MASK      ((uint64_t)0xFFF8000000000000)
-#define VAL_VOIDPTR       ((uint64_t)0x7FF8000000000000)
-#define VAL_CHARPTR       ((uint64_t)0x7FF9000000000000)
-#define VAL_BUFPTR        ((uint64_t)0x7FFA000000000000)
+#define VAL_PTRTAG_VOID   ((uint64_t)0x7FF8000000000000)
+#define VAL_PTRTAG_CHAR   ((uint64_t)0x7FF9000000000000)
+#define VAL_PTRTAG_BUF    ((uint64_t)0x7FFA000000000000)
 
 // This is reserved for future expansions.
 #define VAL_PTRTAG_5      ((uint64_t)0x7FFB000000000000)
@@ -103,11 +103,14 @@ typedef struct valpointer_2_s {int x;} *valpointer_2_t;
 typedef struct valpointer_1_s {int x;} *valpointer_1_t; 
 #endif
 
-// Any pointer will succeed, regardless the tag
-#define valispointer(x)  ((val(x).v & VAL_PTR_MASK)  == VAL_VOIDPTR)
+#define valispointer(p,...) val_ispointer(p,__VA_ARGS__ +0)
+static inline int val_ispointer(val_t v, uint64_t tag)  {
+    if (tag == 0) return ((v.v & VAL_PTR_MASK)  == VAL_PTRTAG_VOID);
+  else            return ((v.v & VAL_TAG_MASK)  == tag); 
+}
 
-#define valischarptr(x)  ((val(x).v & VAL_TAG_MASK) == VAL_CHARPTR)
-#define valisbufptr(x)   ((val(x).v & VAL_TAG_MASK) == VAL_BUFPTR)
+#define valischarptr(x)  ((val(x).v & VAL_TAG_MASK) == VAL_PTRTAG_CHAR)
+#define valisbufptr(x)   ((val(x).v & VAL_TAG_MASK) == VAL_PTRTAG_BUF)
 
 // ==== CONSTANTS
 #define VAL_CONST_MASK    ((uint64_t)0xFFFFFFFF00000000)
@@ -127,8 +130,8 @@ static const val_t valnil = {VAL_NIL};
 #define valisnil(x)     ((val(x).v == VAL_NIL))
 
 // The val_t corresponding of the C pointer NULL
-static const val_t valnullptr = (val_t){VAL_VOIDPTR};
-#define valisnullptr(x)  (val(x).v  == VAL_VOIDPTR)
+static const val_t valnullptr = (val_t){VAL_PTRTAG_VOID};
+#define valisnullptr(x)  (val(x).v  == VAL_PTRTAG_VOID)
 
 // User defined constants
 #define valconst(x) ((val_t){ VAL_CONST_0 | ((x) & VAL_32BIT_MASK)})
@@ -144,9 +147,9 @@ static const val_t valnullptr = (val_t){VAL_VOIDPTR};
 static inline val_t val_fromdouble(double v)    {val_t ret = valnil; memcpy(&ret,&v,sizeof(val_t)); return ret;}
 static inline val_t val_fromfloat(float f)      {return val_fromdouble((double)f);}
 
-static inline val_t val_frompvoidtr(void *v)    {val_t ret; ret.v = VAL_VOIDPTR  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromcharptr(void *v)    {val_t ret; ret.v = VAL_CHARPTR  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_frombufptr(void *v)     {val_t ret; ret.v = VAL_BUFPTR   | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_frompvoidtr(void *v)    {val_t ret; ret.v = VAL_PTRTAG_VOID  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromcharptr(void *v)    {val_t ret; ret.v = VAL_PTRTAG_CHAR  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_frombufptr(void *v)     {val_t ret; ret.v = VAL_PTRTAG_BUF   | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 static inline val_t val_fromptr_5(void *v)      {val_t ret; ret.v = VAL_PTRTAG_5 | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 static inline val_t val_fromptr_4(void *v)      {val_t ret; ret.v = VAL_PTRTAG_4 | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 static inline val_t val_fromptr_3(void *v)      {val_t ret; ret.v = VAL_PTRTAG_3 | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
@@ -235,13 +238,11 @@ static inline uint64_t val_tounsignedint(val_t v) {
 static inline   void *val_topointer(val_t v) {return (void *)((uintptr_t)((v.v) & VAL_PAYLOAD_MASK));}
 
 #define valpointertag(v) val_pointertag(val(v))
-static inline int val_pointertag(val_t v) 
+static inline uint64_t val_pointertag(val_t v) 
 {
   uint64_t ret = 0;
   if (valispointer(v)) {
     ret = (v.v) & VAL_TAG_MASK;
-    ret = 0x07 - ((ret >> 48) & 0x07);
-    ret = ret + 1;
   }
   return ret ;
 }

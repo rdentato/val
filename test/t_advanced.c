@@ -6,6 +6,7 @@
 
 // Define custom pointer types before including val.h
 #define valpointer_1_t FILE *
+#define PTRTAG_FILE VAL_PTRTAG_1
 
 #include "val.h"
 
@@ -31,6 +32,8 @@ tstsuite("Val Library Advanced Use Cases", advanced) {
         
         tstcheck(valispointer(ptr_val), "Pointer should be identified as a pointer");
         tstcheck(valtopointer(ptr_val) == ptr, "Pointer should be extracted correctly");
+        tstcheck(valispointer(ptr_val, VAL_PTRTAG_VOID), "Pointer should be identified as a void pointer");
+        tstcheck(!valispointer(ptr_val, VAL_PTRTAG_CHAR), "Pointer should not be identified as a char pointer");
         
         free(ptr);
     }
@@ -41,7 +44,7 @@ tstsuite("Val Library Advanced Use Cases", advanced) {
         val_t file_val = val(file);
         
         tstcheck(valispointer(file_val), "FILE* should be identified as a pointer");
-        tstcheck(valpointertag(file_val) == 1, "FILE* should have tag 1 (%d) (%016lx)",valpointertag(file_val), file_val.v);
+        tstcheck(valispointer(file_val, PTRTAG_FILE), "FILE* should be identified as a pointer 1");
         tstcheck(valtopointer(file_val) == file, "FILE* should be extracted correctly");
         
         fclose(file);

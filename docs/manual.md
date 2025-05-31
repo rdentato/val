@@ -106,13 +106,25 @@ val_t c = valconst(0x1234ABCD);
 if (valisdouble(x))      // true if IEEE-754 double
 if (valissignedint(x))   // true if signed int48
 if (valisunsignedint(x)) // true if unsigned int48
-if (valispointer(x))     // true for any pointer tag
+if (valispointer(x[,t])) // true for pointers with tag t (or any pointer if t is omitted)
 if (valischarptr(x))     // specifically a char *
 if (valisboolean(x))     // true for bool
 if (valisconst(x))       // true for user constants
 if (valisnil(x))         // true if nil
 if (valisnullptr(x))     // true if C NULL pointer
 ```
+
+Use one onf the predefined constants to check the pointer tags:
+
+| Type               | Tag               |
+| ------------------ | ----------------- |
+|  void *            |  VAL_PTRTAG_VOID  |       
+|  char *            |  VAL_PTRTAG_CHAR  |       
+|  buf_t             |  VAL_PTRTAG_BUF   |       
+|  val_pointer_4_t   |  VAL_PTRTAG_4     |       
+|  val_pointer_3_t   |  VAL_PTRTAG_3     |
+|  val_pointer_2_t   |  VAL_PTRTAG_2     |
+|  val_pointer_1_t   |  VAL_PTRTAG_1     |
 
 ---
 
@@ -124,7 +136,7 @@ int64_t     si = valtosignedint(x);     // any numeric → signed int64
 uint64_t    ui = valtounsignedint(x);   // any numeric → unsigned int64
 _Bool       bb = valtobool(x);          // bool/const → C _Bool
 void       *pv = valtopointer(x);       // pointer tags → void*
-int         tag = valpointertag(x);     // 1..5 for ptr_1..ptr_5, 0 otherwise
+int        tag = valpointertag(x);      // a PTRTAG constant if it's a pointer, 0 otherwise
 ```
 
 * Integers up to 48 bits map exactly to `double` (per IEEE-754 guarantees).
@@ -188,7 +200,7 @@ int main(void) {
     // Pointer tags
     void *p = malloc(10);
     val_t vp = val(p);
-    assert(valispointer(vp) && valpointertag(vp) == 8);
+    assert(valispointer(vp,VAL_PTRTAG_VOID));
 
     return 0;
 }
