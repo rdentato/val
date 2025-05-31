@@ -46,7 +46,7 @@ tstsuite("Val Library Advanced Use Cases", advanced) {
         tstcheck(valispointer(file_val), "FILE* should be identified as a pointer");
         tstcheck(valispointer(file_val, PTRTAG_FILE), "FILE* should be identified as a pointer 1");
         tstcheck(valtopointer(file_val) == file, "FILE* should be extracted correctly");
-        
+        tstcheck(valispointer(stdout,PTRTAG_FILE));
         fclose(file);
     }
     
