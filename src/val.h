@@ -103,7 +103,7 @@ typedef struct valpointer_2_s {int x;} *valpointer_2_t;
 typedef struct valpointer_1_s {int x;} *valpointer_1_t; 
 #endif
 
-#define valispointer(p,...) val_ispointer(p,__VA_ARGS__ +0)
+#define valispointer(p,...) val_ispointer(val(p), __VA_ARGS__ +0)
 static inline int val_ispointer(val_t v, uint64_t tag)  {
     if (tag == 0) return ((v.v & VAL_PTR_MASK)  == VAL_PTRTAG_VOID);
   else            return ((v.v & VAL_TAG_MASK)  == tag); 
