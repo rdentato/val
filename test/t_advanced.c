@@ -10,6 +10,10 @@
 
 #include "val.h"
 
+struct  valpointer_2_s { int x; int y; };
+#define point_t valpointer_2_t 
+#define PTRTAG_POINT VAL_PTRTAG_2
+
 tstsuite("Val Library Advanced Use Cases", advanced) {
     tstcase("48-bit Integer Limits") {
         // 48-bit signed integer limit is 2^47 - 1 = 140,737,488,355,327
@@ -38,7 +42,7 @@ tstsuite("Val Library Advanced Use Cases", advanced) {
         free(ptr);
     }
     
-    tstcase("Custom Pointer Types") {
+    tstcase("Custom Pointer Types (via define)") {
 
         FILE *file = tmpfile();
         val_t file_val = val(file);
@@ -50,6 +54,17 @@ tstsuite("Val Library Advanced Use Cases", advanced) {
         fclose(file);
     }
     
+    tstcase("Custom Pointer Types (via struct typedef)") {
+
+        point_t point = malloc(sizeof(*point));
+        val_t point_val = val(point);
+        
+        tstcheck(valispointer(point_val), "point_t should be identified as a pointer");
+        tstcheck(valispointer(point_val, PTRTAG_POINT), "point_t should be identified as a pointer 1");
+        tstcheck(valtopointer(point_val) == point, "point_t should be extracted correctly");
+        free(point);
+    }
+
     tstcase("Memory Size Verification") {
         // Verify that val_t is 8 bytes
         tstcheck(sizeof(val_t) == 8, "val_t should be exactly 8 bytes");

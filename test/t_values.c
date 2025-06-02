@@ -6,9 +6,6 @@
 
 #include "val.h"
 
-// Define custom pointer types before including val.h
-#define valpointer_0_t FILE *
-
 // Define custom constants
 #define notfound valconst(1)
 #define end_of_list valconst(2)
