@@ -81,7 +81,7 @@ typedef struct val_buf_s *val_buf_t;
 // This is reserved for future expansions.
 #define VAL_PTRTAG_5      ((uint64_t)0x7FFB000000000000)
 #ifndef valpointer_5_t
-typedef struct valpointer_5_s {int x;} *valpointer_5_t; 
+typedef struct valpointer_5_s *valpointer_5_t; 
 #endif
 
 // These can be user defined.
@@ -91,16 +91,16 @@ typedef struct valpointer_5_s {int x;} *valpointer_5_t;
 #define VAL_PTRTAG_1      ((uint64_t)0x7FFF000000000000)
 
 #ifndef valpointer_4_t
-typedef struct valpointer_4_s {int x;} *valpointer_4_t; 
+typedef struct valpointer_4_s *valpointer_4_t; 
 #endif
 #ifndef valpointer_3_t
-typedef struct valpointer_3_s {int x;} *valpointer_3_t; 
+typedef struct valpointer_3_s *valpointer_3_t; 
 #endif
 #ifndef valpointer_2_t
-typedef struct valpointer_2_s {int x;} *valpointer_2_t; 
+typedef struct valpointer_2_s *valpointer_2_t; 
 #endif
 #ifndef valpointer_1_t
-typedef struct valpointer_1_s {int x;} *valpointer_1_t; 
+typedef struct valpointer_1_s *valpointer_1_t; 
 #endif
 
 #define valispointer(p,...) val_ispointer(val(p), __VA_ARGS__ +0)
