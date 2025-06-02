@@ -74,6 +74,7 @@ typedef struct val_buf_s *val_buf_t;
 
 // ==== POINTERS
 #define VAL_PTR_MASK      ((uint64_t)0xFFF8000000000000)
+
 #define VAL_PTRTAG_VOID   ((uint64_t)0x7FF8000000000000)
 #define VAL_PTRTAG_CHAR   ((uint64_t)0x7FF9000000000000)
 #define VAL_PTRTAG_BUF    ((uint64_t)0x7FFA000000000000)
@@ -218,6 +219,7 @@ static inline int64_t val_tosignedint(val_t v)
 { int64_t ret = 0;
   if (valissignedint(v)) {
     ret =((v.v) & VAL_PAYLOAD_MASK); 
+    //                                              ↓ extend the minus sign     
     ret |= ((v.v & VAL_INT_SIGN) == VAL_INT_SIGN) ? (uint64_t)0xFFFF000000000000 : (uint64_t)0x0;
   }
   else if (valisunsignedint(v))  ret = (int64_t)val_tounsignedint(v); 
@@ -235,16 +237,13 @@ static inline uint64_t val_tounsignedint(val_t v) {
 }
 
 #define valtopointer(v) val_topointer(val(v))
-static inline   void *val_topointer(val_t v) {return (void *)((uintptr_t)((v.v) & VAL_PAYLOAD_MASK));}
+static inline   void *val_topointer(val_t v) {
+  return valispointer(v) ? (void *)((uintptr_t)(v.v & VAL_PAYLOAD_MASK)) : NULL;
+}
 
 #define valpointertag(v) val_pointertag(val(v))
-static inline uint64_t val_pointertag(val_t v) 
-{
-  uint64_t ret = 0;
-  if (valispointer(v)) {
-    ret = (v.v) & VAL_TAG_MASK;
-  }
-  return ret ;
+static inline uint64_t val_pointertag(val_t v) {
+  return valispointer(v) ? (v.v & VAL_TAG_MASK) : 0;
 }
 
 // This checks for val_t values IDENTITY
@@ -265,7 +264,7 @@ static inline int val_cmp(val_t a, val_t b)
     else if (valisbufptr(b) && ((sb = valtopointer(b)) != NULL)) sb = *((char **)sb);
   }
 
-  if (sb) return strcmp(sa,sb);
+  if (sb) return strcmp(sa, sb);
   
   double da = 0.0,  db = 0.0;
   int    is_da = 0, is_db = 0;
