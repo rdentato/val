@@ -250,7 +250,7 @@ static inline uint64_t val_pointertag(val_t v)
 // This checks for val_t values IDENTITY
 #define valeq(x,y) (val(x).v == val(y).v)
 
-// This compares two val_t values. LIke the hash function below, It is provide just for convenience 
+// This compares two val_t values. Like the hash function below, it is provide just for convenience 
 // since your criteria for comparison and hashing might be different.
 #define valcmp(a,b) val_cmp(val(a),val(b))
 static inline int val_cmp(val_t a, val_t b)
