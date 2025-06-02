@@ -10,6 +10,7 @@
 
 #include "val.h"
 
+// Or after as long as it is a pointer to a structure (the most common case)
 struct  valpointer_2_s { int x; int y; };
 #define point_t valpointer_2_t 
 #define PTRTAG_POINT VAL_PTRTAG_2
