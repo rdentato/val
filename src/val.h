@@ -64,8 +64,8 @@ static_assert(sizeof(val_t) == 8, "Wrong size for uint64_t");
 
 // By effect of the IEEE 754 standard, only integers up to 52 bits are representable.
 // We'll check directly on the bit represantation of doubles. See IEEE754.md in the docs direcotory
-#define valisint(x) val_isinteger(val(x))
-static inline int val_isinteger(val_t v) {
+#define valisint(x) val_isint(val(x))
+static inline int val_isint(val_t v) {
  
   int exp_bits = (int)((v.v >> 52) & 0x7FF); // Extract the exponent (11 bits)
   uint64_t frac_bits = v.v & ((((uint64_t)1) << 52) - 1); // Extract the fraction field (52 bits)
@@ -105,9 +105,6 @@ static const val_t    valnil = {VAL_NIL};
 #define valisconst(x) ((val(x).v & VAL_CONST_MASK) == VAL_CONST_0)
 
 // ==== POINTERS
-// Checks that there are at least three zero bits in memory aligned pointers
-static_assert(alignof(double) >= 8, "Need 8-bytes pointer alignment");
-
 #define VAL_PTR_MASK    ((uint64_t)0xFFF8000000000000)
 
 #define VAL_PTR_VOID    ((uint64_t)0x7FF8000000000000)
@@ -154,7 +151,7 @@ static inline int val_isptr(val_t v, uint64_t ptr_type)  {
 // The val_t corresponding of the C pointer NULL
 static const val_t valnullptr = {VAL_PTR_VOID};
 
-#define valisnullptr(x)  (val(x).v  == VAL_PTR_VOID)
+#define valisnullptr(x)  (valtoptr(x) == NULL)
 
 // This is used for convenience
 static char *val_emptystr = "\0\0\0"; // FOUR nul bytes
@@ -252,6 +249,15 @@ static inline  _Bool val_tobool(val_t v)  {
 // This can be used, for example, to mark a pointer as "visited" or
 // "to be disposed" without having to resort to additional memory.
 
+// Checks that there are at least three zero bits in memory aligned pointers
+#ifdef _MSC_VER
+  // Make up for lack of `max_align_t` in MS cl
+  #define max_align_t double
+#endif
+
+#define VAL_MIN_ALIGN 8
+static_assert(alignof(max_align_t) >= VAL_MIN_ALIGN, "Alignment requirements not matched");
+
 static inline int val_check_taggable_ptr(val_t v) {
   // Not a pointer
   if ((v.v & VAL_PTR_MASK) != VAL_PTR_VOID) return -1; 
@@ -264,7 +270,7 @@ static inline int val_check_taggable_ptr(val_t v) {
 }
 
 // Tags are 3 bits long
-#define VAL_TAG_MASK  ((uint64_t)0x07)
+#define VAL_TAG_MASK  ((uint64_t)(VAL_MIN_ALIGN-1))
 
 #define valtoptr(v) val_toptr(val(v))
 static inline   void *val_toptr(val_t v) {

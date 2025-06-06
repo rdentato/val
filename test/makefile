@@ -11,7 +11,7 @@ endif
 
 DEBUG=-DDEBUG
  
-CFLAGS=-O2 -Wall -I../src -I. $(ADDCFLAGS) $(STATIC) $(DEBUG)
+CFLAGS=-O2 -Wall -I../src -I. $(ARCH) $(STATIC) $(DEBUG)
 
 TESTS_SRC=$(wildcard t_*.c)
 TESTS_RAW=$(TESTS_SRC:.c=)
@@ -31,10 +31,10 @@ MAKEFLAGS += --no-builtin-rules
 	$(CC) $(CFLAGS) -o $*.o -c $< 
 
 %$(_EXE): %.o 
-	$(CC) -o $* $< $(LIBS)
+	$(CC) $(ARCH) -s -o $* $< $(LIBS)
 
 %.obj: %.c ../src/val.h
-	$(CC) $(CFLAGS) -o $*.obj -c $< 
+	$(CC) $(ARCH) $(CFLAGS) -o $*.obj -c $< 
 
 .PRECIOUS: %.o %.obj
 
