@@ -58,8 +58,32 @@ tstsuite("Val Library pointers", advanced) {
         free(point);
     }
 
-    tstcase("Memory Size Verification") {
-        // Verify that val_t is 8 bytes
-        tstcheck(sizeof(val_t) == 8, "val_t should be exactly 8 bytes");
+    tstcase("Popinter tagging") {
+        point_t point = malloc(sizeof(*point));
+        val_t point_val = val(point);
+        
+        tstcheck((valtagptr(point_val) == 0), "Expect 0 got %d",valtagptr(point_val));
+        point_val = valtagptr(point_val,2);
+        tstcheck((valtagptr(point_val) == 2), "Expect 2 got %d",valtagptr(point_val));
+
+        point_val = valtagptr(point_val,6);
+        tstcheck((valtagptr(point_val) == 6), "Expect 6 got %d",valtagptr(point_val));
+
+        point_val = valtagptr(point_val,0);
+        tstcheck((valtagptr(point_val) == 0), "Expect 0 got %d",valtagptr(point_val));
+
+        // Untaggable pointer (char *)
+        val_t charptr_val = val("Hello");
+        tstcheck((valtagptr(charptr_val) == 0), "Expect 0 got %d",valtagptr(charptr_val));
+        charptr_val = valtagptr(charptr_val,2);
+        tstcheck((valtagptr(charptr_val) == 0), "Expect 0 got %d",valtagptr(charptr_val));
+
+        // Untaggable pointer (char *)
+        val_t void_val = val((void *)&void_val);
+        tstcheck((valtagptr(void_val) == 0), "Expect 0 got %d",valtagptr(void_val));
+        void_val = valtagptr(void_val,2);
+        tstcheck((valtagptr(void_val) == 0), "Expect 0 got %d",valtagptr(void_val));
+
+        free(point);
     }
 }
