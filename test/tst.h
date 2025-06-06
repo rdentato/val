@@ -20,13 +20,6 @@
   #pragma warn(disable:2250)
   #pragma warn(disable:2287)
   #pragma warn(disable:2804)
-  // #pragma warn(disable:)
-  // #pragma warn(disable:)
-  // #pragma warn(disable:)
-  // #pragma warn(disable:)
-  // #pragma warn(disable:)
-  // #pragma warn(disable:)
-  // #pragma warn(disable:)
 #endif
 
 #ifdef __cplusplus
