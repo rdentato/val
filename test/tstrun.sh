@@ -112,7 +112,7 @@ done
 
 echo "output: $OUTFILE ($WILDCARD)"
 echo "STIME `date`" > $OUTFILE
-find . -name "t_$WILDCARD" -print | sed -e '/\.c$/d' -e '/\.cpp$/d' -e '/\.o$/d' | while read -r f ; do $f $COLOR $TAGS $* ; done 2>> $OUTFILE
+find . -maxdepth 1 -type f -name "t_$WILDCARD" -print | sed -e '/\.c$/d' -e '/\.cpp$/d' -e '/\.o$/d' | while read -r f ; do $f $COLOR $TAGS $* ; done 2>> $OUTFILE
 
 FAIL=`grep '^[0-9 ]*FAIL' $OUTFILE | wc -l`
 PASS=`grep '^[0-9 ]*PASS' $OUTFILE | wc -l`

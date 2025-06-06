@@ -90,8 +90,8 @@ tstsuite("Val Library Real-world Usage", usage) {
         
         // Extract as different types
         double d = valtodouble(start);
-        int i = valtoint(start);
-        unsigned int u = valtounsignedint(start);
+        int i = (int)valtoint(start);
+        unsigned int u = (unsigned int)valtounsignedint(start);
         bool b = valtobool(start);
         
         // Convert back to val_t

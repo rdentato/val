@@ -306,7 +306,6 @@ static inline int val_tagptr_get(val_t v) {
   return (v.v & VAL_TAG_MASK);
 }
 
-
 // This checks for val_t values IDENTITY
 #define valeq(x,y) (val(x).v == val(y).v)
 
@@ -382,6 +381,12 @@ static inline uint32_t val_hash(val_t v) {
     hash = (uint32_t)(h >> 32);
   }
   return hash;
+}
+
+// This is needed to avoid warnings about unused static variables.
+static inline uint64_t val_usestatic()
+{
+  return (valnil.v | valtrue.v | valfalse.v | valnullptr.v);
 }
 
 #endif

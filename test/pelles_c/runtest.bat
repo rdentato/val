@@ -28,7 +28,7 @@ del /Q test.log 2>nul
 rem Step 1: Compile all t_*.c from parent directory, adding include paths and using optimization + high warnings
 for %%F in ("..\t_*.c") do (
     echo Compiling %%~nxF...
-    cc /O2 /W2 /I".." /I"..\..\src" /Fo "%%~nF".obj "%%~F" 
+    cc /O2 /W2 /I".." /I"..\..\src" /Fo".\%%~nF.obj" "%%~F" 
 )
 
 rem Step 2: Run each compiled t_*.exe and append stderr to test.log

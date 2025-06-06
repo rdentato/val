@@ -6,11 +6,27 @@
 #define TST_VERSION 0x0007004C
 
 #ifdef _MSC_VER
+  /* Microsoft cl compiler */
   #pragma warning(disable:4100)
   #pragma warning(disable:4189)
   #pragma warning(disable:4244)
   #pragma warning(disable:4459)
   #pragma warning(disable:4996)  
+#endif
+
+#ifdef __POCC__
+  /* Pelles pocc compiler */
+  #pragma warn(disable:2014)
+  #pragma warn(disable:2250)
+  #pragma warn(disable:2287)
+  #pragma warn(disable:2804)
+  // #pragma warn(disable:)
+  // #pragma warn(disable:)
+  // #pragma warn(disable:)
+  // #pragma warn(disable:)
+  // #pragma warn(disable:)
+  // #pragma warn(disable:)
+  // #pragma warn(disable:)
 #endif
 
 #ifdef __cplusplus
@@ -167,7 +183,7 @@ static inline char *tst_time(void)
 }
 
 #define tstrun_(tst_, title_,...) \
-  tst_tags(0,__VA_ARGS__); void tst__run(int n); \
+  tst_tags(0,__VA_ARGS__); void tst__run(); \
   int main(int argc, char **argv) { \
     const char *tst_options=getenv("TSTOPTIONS"); \
     tst_title = title_; \
@@ -177,10 +193,11 @@ static inline char *tst_time(void)
     else if(CLOCKS_PER_SEC > ((clock_t)1000) + tst_zero) tst_clock_unit = "u"; \
     else tst_clock_unit = "m"; \
     fprintf(stderr, "----- %s%s %s \"%s\" %s%s%s\n", tst_color+tst_str_cyan,tst_str_file, __FILE__, tst_title, tst_time(), tst_color+tst_str_normal,(tst_?"":" (disabled)"));\
-    if (tst_) tst__run(tst_usestatic); \
+    if (tst_) tst__run(); \
+    tst_zero &= tst_usestatic; \
     fputs(tst_str_file_end,stderr); tst_prt_results(tst_fail, tst_pass, tst_skip); fprintf(stderr," %s\n",tst_time());\
     return ((tst_fail > 0) * tst_report_err); \
-  } void tst__run(int tst_n) 
+  } void tst__run() 
 
 #define tstsuite(title_,...)  tstrun_((!tst_zero), title_, __VA_ARGS__)
 #define tst_suite(title_,...) tstrun_(( tst_zero), title_, __VA_ARGS__)
@@ -188,7 +205,7 @@ static inline char *tst_time(void)
 static short tst_vars[6] = {0}; // Ensures that `tstcheck` can be used outside a `tstcase` block.
 
 // This is only used to avoid that the compiler complains about unused static variables.
-#define tst_usestatic ((  tst_result & tst_case_pass & tst_case_fail & tst_case_skip \
+#define tst_usestatic ((short)(  tst_result & tst_case_pass & tst_case_fail & tst_case_skip \
                         & tst_vars[0] & tstdata[0] & (int)tstelapsed))
 
 #define tst(x) (tst_result = (short)(!!(x)))

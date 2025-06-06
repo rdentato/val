@@ -39,5 +39,5 @@ MAKEFLAGS += --no-builtin-rules
 .PRECIOUS: %.o %.obj
 
 clean:
-	rm -f $(TESTS_RAW) $(TESTS_RAW:=.exe) $(TESTS_RAW:=.o) test.log functions.o
+	rm -f $(TESTS_RAW) $(TESTS_RAW:=.exe) $(TESTS_RAW:=.o) $(TESTS_RAW:=.obj) test.log functions.o
 
