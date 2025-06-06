@@ -53,13 +53,7 @@ All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 
 ## Installation
 
-Simply copy `val.h` into your project’s include directory:
-
-```bash
-curl -O https://raw.githubusercontent.com/yourusername/val/v0.3.0-beta/val.h
-```
-
-Then in your source:
+Simply copy `val.h` into your project’s include directory, then in your source:
 
 ```c
 #include "val.h"
@@ -85,8 +79,8 @@ int main(void) {
 
     // Type checks
     assert(valisdouble(d));
-    assert(valisinteger(i));
-    assert(valisinteger(u));
+    assert(valisint(i));
+    assert(valisint(u));
     assert(valisbool(b));
     assert(valischarptr(s));
 
@@ -101,8 +95,10 @@ int main(void) {
     val_t x = val(10);
     val_t y = val(20);
     printf("cmp(x,y)  = %d\n", valcmp(x,y));   // –1
-    printf("cmp(x,10) = %d\n", valcmp(x,10));  // 0
     
+    // Note that in `valcomp()`, `10` is automatically converted to `val_t`
+    printf("cmp(x,10) = %d\n", valcmp(x,10));  // 0
+
     // Hashing
     printf("hash(\"NaN-boxing\") = 0x%x\n", valhash(s));
     return 0;
