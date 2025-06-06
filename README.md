@@ -1,13 +1,13 @@
 # val — A NaN-Boxed Dynamic Value Library for C
 
-[![Version](https://img.shields.io/badge/version-0.3.1%20Beta-blue.svg)](https://github.com/yourusername/val)
+[![Version](https://img.shields.io/badge/version-0.3.5%20Beta-blue.svg)](https://github.com/yourusername/val)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 `val` is a single-header, zero-dependency library that implements a dynamic **`val_t`** type for C programs via **NaN-boxing**. It can store:
 
 * IEEE-754 double-precision floats
 * Signed and unsigned 52-bit integers (as double)
-* Typed pointers (void, char, custom payload)
+* Typed pointers (void, char, custom pointers)
 * Booleans, `nil`, and user-defined constants
 
 All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.

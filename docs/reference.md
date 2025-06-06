@@ -1,9 +1,7 @@
-# val API Documentation
-
-A C library for NaN boxing and pointer tagging that stores different types of values in a single 64-bit structure.
 
 [val API Documentation](#val-api-documentation)
 - [val API Documentation](#val-api-documentation)
+  - [What is NaN Boxing?](#what-is-nan-boxing)
   - [Core Type](#core-type)
     - [`val_t`](#val_t)
   - [Constants](#constants)
@@ -35,6 +33,16 @@ A C library for NaN boxing and pointer tagging that stores different types of va
     - [`int valcmp(val_t a, val_t b)`](#int-valcmpval_t-a-val_t-b)
     - [`uint32_t valhash(val_t a)`](#uint32_t-valhashval_t-a)
   - [Example Usage](#example-usage)
+
+# val API Documentation
+
+A C library for NaN boxing and pointer tagging that stores different types of values in a single 64-bit structure.
+
+## What is NaN Boxing?
+
+**NaN Boxing** exploits the special "Not-a-Number" (NaN) representations defined by IEEE 754 floating-point numbers. Since a double-precision floating-point number uses 64 bits, certain NaN patterns can be safely repurposed to encode other data types (integers, pointers, booleans, etc.) without ambiguity.
+
+The library encodes these various types inside a `val_t`, making type handling seamless and efficient.
 
 ## Core Type 
 ### `val_t`
