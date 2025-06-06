@@ -36,12 +36,12 @@ All these constants are guaranteed to be different from any other val_t value.
 |----------|-------------|
 | `valisdouble(v)` | Check if value is a double |
 | `valisinteger(v)` | Check if value is any integer (signed or unsigned) |
-| `valissignedint(v)` | Check if value is a signed integer |
-| `valisunsignedint(v)` | Check if value is an unsigned integer |
-| `valisboolean(v)` | Check if value is a boolean |
+| `valisinteger(v)` | Check if value is a signed integer |
+| `valisinteger(v)` | Check if value is an unsigned integer |
+| `valisbool(v)` | Check if value is a boolean |
 | `valisnil(v)` | Check if value is nil |
 | `valisconst(v)` | Check if value is a custom constant |
-| `valispointer(v)` | Check if value is any pointer type |
+| `valisptr(v)` | Check if value is any pointer type |
 | `valischarptr(v)` | Check if value is a character pointer |
 | `valisnullptr(v)` | Check if value is a null pointer |
 
@@ -50,10 +50,10 @@ All these constants are guaranteed to be different from any other val_t value.
 | Function | Description |
 |----------|-------------|
 | `valtodouble(v)` | Extract double value |
-| `valtosignedint(v)` | Extract signed integer value |
+| `valtoint(v)` | Extract signed integer value |
 | `valtounsignedint(v)` | Extract unsigned integer value |
 | `valtobool(v)` | Extract boolean value |
-| `valtopointer(v)` | Extract raw pointer value |
+| `valtoptr(v)` | Extract raw pointer value |
 | `valpointertag(v)` | Get the tag of a pointer value (to determine pointer type) |
 
 ## Operations

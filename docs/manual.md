@@ -55,12 +55,12 @@ Anything *not* matching the quiet-NaN pattern is treated as a raw IEEE-754 doubl
 | Type               | Tag value (hex)               | Macro predicates         |
 | ------------------ | ----------------------------- | ------------------------ |
 | **Double**         | *Not* matching `VAL_NAN_MASK` | `valisdouble(x)`         |
-| **Signed int48**   | `0xFFFF_0000_0000_0000`       | `valissignedint(x)`      |
-| **Unsigned int48** | `0xFFFE_0000_0000_0000`       | `valisunsignedint(x)`    |
-| **Void pointer**   | `0x7FF8_0000_0000_0000`       | `valispointer(x)`        |
+| **Signed int48**   | `0xFFFF_0000_0000_0000`       | `valisinteger(x)`      |
+| **Unsigned int48** | `0xFFFE_0000_0000_0000`       | `valisinteger(x)`    |
+| **Void pointer**   | `0x7FF8_0000_0000_0000`       | `valisptr(x)`        |
 | **Char pointer**   | `0x7FF9_0000_0000_0000`       | `valischarptr(x)`        |
 | **Ptr tag 1–4**    | `0x7FFF…0x7FFC_…`             | `valpointertag(x)`       |
-| **Boolean**        | `0xFFF8_FFFF_0000_0000`       | `valisboolean(x)`        |
+| **Boolean**        | `0xFFF8_FFFF_0000_0000`       | `valisbool(x)`        |
 | **Nil**            | `0xFFF8_00FF_0000_0000`       | `valisnil(x)`            |
 | **Null pointer**   | `0x7FF8_0000_0000_0000`       | `valisnullptr(x)`        |
 | **User constant**  | `0xFFF8_000F_0000_0000`       | `valisconst(x)`          |
@@ -104,11 +104,11 @@ val_t c = valconst(0x1234ABCD);
 
 ```c
 if (valisdouble(x))      // true if IEEE-754 double
-if (valissignedint(x))   // true if signed int48
-if (valisunsignedint(x)) // true if unsigned int48
-if (valispointer(x[,t])) // true for pointers with tag t (or any pointer if t is omitted)
+if (valisinteger(x))   // true if signed int48
+if (valisinteger(x)) // true if unsigned int48
+if (valisptr(x[,t])) // true for pointers with tag t (or any pointer if t is omitted)
 if (valischarptr(x))     // specifically a char *
-if (valisboolean(x))     // true for bool
+if (valisbool(x))     // true for bool
 if (valisconst(x))       // true for user constants
 if (valisnil(x))         // true if nil
 if (valisnullptr(x))     // true if C NULL pointer
@@ -132,10 +132,10 @@ Use one onf the predefined constants to check the pointer tags:
 
 ```c
 double      d  = valtodouble(x);        // double/int → double
-int64_t     si = valtosignedint(x);     // any numeric → signed int64
+int64_t     si = valtoint(x);     // any numeric → signed int64
 uint64_t    ui = valtounsignedint(x);   // any numeric → unsigned int64
 _Bool       bb = valtobool(x);          // bool/const → C _Bool
-void       *pv = valtopointer(x);       // pointer tags → void*
+void       *pv = valtoptr(x);       // pointer tags → void*
 int        tag = valpointertag(x);      // a PTRTAG constant if it's a pointer, 0 otherwise
 ```
 
@@ -186,7 +186,7 @@ int main(void) {
 
     // Print numeric values
     printf("a = %lld, b = %.2f\n",
-           (long long)valtosignedint(a),
+           (long long)valtoint(a),
            valtodouble(b));
 
     // Compare (note that 100 will be autoconverted into a val_t value)
@@ -200,7 +200,7 @@ int main(void) {
     // Pointer tags
     void *p = malloc(10);
     val_t vp = val(p);
-    assert(valispointer(vp,VAL_PTRTAG_VOID));
+    assert(valisptr(vp,VAL_PTRTAG_VOID));
 
     return 0;
 }

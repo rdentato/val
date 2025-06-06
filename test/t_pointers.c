@@ -5,15 +5,15 @@
 #include <stdint.h>
 
 // Define custom pointer types before including val.h
-#define valpointer_1_t FILE *
-#define PTRTAG_FILE VAL_PTRTAG_1
+#define valptr_1_t FILE *
+#define PTRTAG_FILE VAL_PTR_1
 
 #include "val.h"
 
 // Or after as long as it is a pointer to a structure (the most common case)
-struct  valpointer_2_s { int x; int y; };
-#define point_t valpointer_2_t 
-#define PTRTAG_POINT VAL_PTRTAG_2
+struct  valptr_2_s { int x; int y; };
+#define point_t valptr_2_t 
+#define PTRTAG_POINT VAL_PTR_2
 
 tstsuite("Val Library pointers", advanced) {
     tstcase("48-bit Pointer Storage") {
@@ -21,18 +21,18 @@ tstsuite("Val Library pointers", advanced) {
         void *ptr = malloc(10);
         val_t ptr_val = val(ptr);
         
-        tstcheck(valispointer(ptr_val), "Pointer should be identified as a pointer");
-        tstcheck(valtopointer(ptr_val) == ptr, "Pointer should be extracted correctly");
-        tstcheck(valispointer(ptr_val, VAL_PTRTAG_VOID), "Pointer should be identified as a void pointer");
-        tstcheck(!valispointer(ptr_val, VAL_PTRTAG_CHAR), "Pointer should not be identified as a char pointer");
+        tstcheck(valisptr(ptr_val), "Pointer should be identified as a pointer");
+        tstcheck(valtoptr(ptr_val) == ptr, "Pointer should be extracted correctly");
+        tstcheck(valisptr(ptr_val, VAL_PTR_VOID), "Pointer should be identified as a void pointer");
+        tstcheck(!valisptr(ptr_val, VAL_PTR_CHAR), "Pointer should not be identified as a char pointer");
         
         free(ptr);
     }
 
     tstcase("A non pointer is a NULL pointer") {
         val_t int_val = val(3);
-        tstcheck(valtopointer(int_val) == NULL);
-        tstcheck(!valispointer(int_val));
+        tstcheck(valtoptr(int_val) == NULL);
+        tstcheck(!valisptr(int_val));
     }
     
     tstcase("Custom Pointer Types (via define)") {
@@ -40,10 +40,10 @@ tstsuite("Val Library pointers", advanced) {
         FILE *file = tmpfile();
         val_t file_val = val(file);
         
-        tstcheck(valispointer(file_val), "FILE* should be identified as a pointer");
-        tstcheck(valispointer(file_val, PTRTAG_FILE), "FILE* should be identified as a pointer 1");
-        tstcheck(valtopointer(file_val) == file, "FILE* should be extracted correctly");
-        tstcheck(valispointer(stdout,PTRTAG_FILE));
+        tstcheck(valisptr(file_val), "FILE* should be identified as a pointer");
+        tstcheck(valisptr(file_val, PTRTAG_FILE), "FILE* should be identified as a pointer 1");
+        tstcheck(valtoptr(file_val) == file, "FILE* should be extracted correctly");
+        tstcheck(valisptr(stdout,PTRTAG_FILE));
         fclose(file);
     }
     
@@ -52,9 +52,9 @@ tstsuite("Val Library pointers", advanced) {
         point_t point = malloc(sizeof(*point));
         val_t point_val = val(point);
         
-        tstcheck(valispointer(point_val), "point_t should be identified as a pointer");
-        tstcheck(valispointer(point_val, PTRTAG_POINT), "point_t should be identified as a pointer 1");
-        tstcheck(valtopointer(point_val) == point, "point_t should be extracted correctly");
+        tstcheck(valisptr(point_val), "point_t should be identified as a pointer");
+        tstcheck(valisptr(point_val, PTRTAG_POINT), "point_t should be identified as a pointer 1");
+        tstcheck(valtoptr(point_val) == point, "point_t should be extracted correctly");
         free(point);
     }
 

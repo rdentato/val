@@ -3,7 +3,15 @@
 //  SPDX-PackageVersion: 0.7.3-rc
 
 #ifndef TST_VERSION
-#define TST_VERSION 0x0007003C
+#define TST_VERSION 0x0007004C
+
+#ifdef _MSC_VER
+  #pragma warning(disable:4100)
+  #pragma warning(disable:4189)
+  #pragma warning(disable:4244)
+  #pragma warning(disable:4459)
+  #pragma warning(disable:4996)  
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,6 +22,7 @@ extern "C" {
 #include <time.h>
 #include <string.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 static volatile short tst_zero = 0;
 static short tst_result     = 0;

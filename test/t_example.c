@@ -62,15 +62,15 @@ tstsuite("Val Library Real-world Usage", usage) {
         val_t result;
         
         result = lookup("int");
-        tstcheck(valissignedint(result), "Should return an integer");
-        tstcheck(valtosignedint(result) == 42, "Should return 42");
+        tstcheck(valisint(result), "Should return an integer");
+        tstcheck(valtoint(result) == 42, "Should return 42");
         
         result = lookup("double");
         tstcheck(valisdouble(result), "Should return a double");
         tstcheck(valtodouble(result) == 3.14, "Should return 3.14");
         
         result = lookup("bool");
-        tstcheck(valisboolean(result), "Should return a boolean");
+        tstcheck(valisbool(result), "Should return a boolean");
         tstcheck(valtobool(result) == true, "Should return true");
         
         result = lookup("null");
@@ -90,7 +90,7 @@ tstsuite("Val Library Real-world Usage", usage) {
         
         // Extract as different types
         double d = valtodouble(start);
-        int i = valtosignedint(start);
+        int i = valtoint(start);
         unsigned int u = valtounsignedint(start);
         bool b = valtobool(start);
         
@@ -102,13 +102,13 @@ tstsuite("Val Library Real-world Usage", usage) {
         
         // Verify types
         tstcheck(valisdouble(back_d), "Should be a double");
-        tstcheck(valissignedint(back_i), "Should be a signed integer");
-        tstcheck(valisunsignedint(back_u), "Should be an unsigned integer");
-        tstcheck(valisboolean(back_b), "Should be a boolean");
+        tstcheck(valisint(back_i), "Should be a signed integer");
+        tstcheck(valisint(back_u), "Should be an unsigned integer");
+        tstcheck(valisbool(back_b), "Should be a boolean");
         
         // Verify values
         tstcheck(valtodouble(back_d) == 42.0, "Value should be 42.0");
-        tstcheck(valtosignedint(back_i) == 42, "Value should be 42");
+        tstcheck(valtoint(back_i) == 42, "Value should be 42");
         tstcheck(valtounsignedint(back_u) == 42u, "Value should be 42u");
         tstcheck(valtobool(back_b) == true, "Value should be true (%d)",valtobool(back_b));
     }

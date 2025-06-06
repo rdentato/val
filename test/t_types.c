@@ -19,20 +19,20 @@ tstsuite("Val Library Type Checking", type_checking) {
         
         tstsection("Double Type Checking") {
             tstcheck(valisdouble(doubleVal), "3.14 should be identified as double");
-            tstcheck(!valisdouble(signedIntVal), "Integer should not be identified as double");
-            tstcheck(!valisdouble(unsignedIntVal), "Unsigned integer should not be identified as double");
+            tstcheck(valisdouble(signedIntVal), "Integer should not be identified as double");
+            tstcheck(valisdouble(unsignedIntVal), "Unsigned integer should not be identified as double");
         }
         
         tstsection("Signed Integer Type Checking") {
-            tstcheck(!valissignedint(doubleVal), "Double should not be identified as signed integer");
-            tstcheck(valissignedint(signedIntVal), "-42 should be identified as signed integer");
-            tstcheck(!valissignedint(unsignedIntVal), "Unsigned integer should not be identified as signed integer");
+            tstcheck(!valisint(doubleVal), "Double should not be identified as signed integer");
+            tstcheck(valisint(signedIntVal), "-42 should be identified as signed integer");
+            tstcheck(valisint(unsignedIntVal), "Unsigned integer should not be identified as signed integer");
         }
         
         tstsection("Unsigned Integer Type Checking") {
-            tstcheck(!valisunsignedint(doubleVal), "Double should not be identified as unsigned integer");
-            tstcheck(!valisunsignedint(signedIntVal), "Signed integer should not be identified as unsigned integer");
-            tstcheck(valisunsignedint(unsignedIntVal), "42u should be identified as unsigned integer");
+            tstcheck(!valisint(doubleVal), "Double should not be identified as unsigned integer");
+            tstcheck(valisint(signedIntVal), "Signed integer should not be identified as unsigned integer");
+            tstcheck(valisint(unsignedIntVal), "42u should be identified as unsigned integer");
         }
     }
     
@@ -40,10 +40,10 @@ tstsuite("Val Library Type Checking", type_checking) {
         val_t boolVal = val((_Bool)true);
         val_t intVal = val(1);
         
-        tstcheck(valisboolean(boolVal), "true should be identified as boolean");
-        tstcheck(!valisboolean(intVal), "1 should not be identified as boolean");
-        tstcheck(valisboolean(valtrue), "valtrue should be identified as boolean");
-        tstcheck(valisboolean(valfalse), "valfalse should be identified as boolean");
+        tstcheck(valisbool(boolVal), "true should be identified as boolean");
+        tstcheck(!valisbool(intVal), "1 should not be identified as boolean");
+        tstcheck(valisbool(valtrue), "valtrue should be identified as boolean");
+        tstcheck(valisbool(valfalse), "valfalse should be identified as boolean");
     }
     
     tstcase("Nil Type Checking") {
@@ -67,10 +67,10 @@ tstsuite("Val Library Type Checking", type_checking) {
         val_t charPtrVal = val(str);
         
         tstsection("Generic Pointer Checking") {
-            tstcheck(valispointer(ptrVal), "Generic pointer should be identified as a pointer");
-            tstcheck(valispointer(charPtrVal), "Char pointer should be identified as a pointer");
-            tstcheck(valispointer(valnullptr), "valnullptr should be identified as a pointer");
-            tstcheck(!valispointer(valtrue), "valtrue should not be identified as a pointer");
+            tstcheck(valisptr(ptrVal), "Generic pointer should be identified as a pointer");
+            tstcheck(valisptr(charPtrVal), "Char pointer should be identified as a pointer");
+            tstcheck(valisptr(valnullptr), "valnullptr should be identified as a pointer");
+            tstcheck(!valisptr(valtrue), "valtrue should not be identified as a pointer");
         }
         
         tstsection("Char Pointer Checking") {

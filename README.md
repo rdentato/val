@@ -12,12 +12,21 @@
 
 All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 
+### Tested on:
+
+|   OS            | compiler        | notes                       |
+|-----------------|-----------------|-----------------------------|
+| Linux           | gcc 11.4.0      |                             |
+| Linux           | clang 14.0.0    |                             |
+| MS Windows 11   | Mingw64 15.1.0  | 64-bits and 32-bits targets |
+| MS Windows 11   | MS cl 19.44     | /std:C11                    |
+
 ---
 
 ## Features
 
 * **Compact representation**: 64-bit `val_t` uses NaN payload bits.
-* **Fast type checks**: Macro utilities like `valisdouble()`, `valissignedint()`, `valispointer()`, `valisboolean()`, `valisnil()`.
+* **Fast type checks**: Macro utilities like `valisdouble()`, `valisinteger()`, `valisptr()`, `valisbool()`, `valisnil()`.
 * **Generic constructors**:
 
   ```c
@@ -29,8 +38,8 @@ All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 
   ```c
   double d  = valtodouble(v1);
-  int64_t i = valtosignedint(v2);
-  char *s   = valtopointer(v3);
+  int64_t i = valtoint(v2);
+  char *s   = valtoptr(v3);
   ```
 * **Comparison & hashing**:
 
@@ -75,17 +84,17 @@ int main(void) {
 
     // Type checks
     assert(valisdouble(d));
-    assert(valissignedint(i));
-    assert(valisunsignedint(u));
-    assert(valisboolean(b));
+    assert(valisinteger(i));
+    assert(valisinteger(u));
+    assert(valisbool(b));
     assert(valischarptr(s));
 
     // Conversions
     printf("double: %f\n", valtodouble(d));
-    printf("signed: %lld\n", (long long)valtosignedint(i));
+    printf("signed: %lld\n", (long long)valtoint(i));
     printf("unsigned: %llu\n", (unsigned long long)valtounsignedint(u));
     printf("bool: %s\n", valtobool(b) ? "true" : "false");
-    printf("string: %s\n", (char *)valtopointer(s));
+    printf("string: %s\n", (char *)valtoptr(s));
 
     // Comparison
     val_t x = val(10);
@@ -130,7 +139,7 @@ The `test` directory is also a source of valuable information.
 * **0.3.0 Beta** (May 2025)
 
   * Introduced generic `_Generic` constructors.
-  * Added custom pointer-tags 1–4.
+  * Added pointer tags 0–7.
   * Improved `valcmp` and `valhash` performance.
 
 ---

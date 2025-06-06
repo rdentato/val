@@ -10,14 +10,12 @@ STATIC=
 endif
 
 DEBUG=-DDEBUG
+ 
+CFLAGS=-O2 -Wall -I../src -I. $(ADDCFLAGS) $(STATIC) $(DEBUG)
 
-CFLAGS=-O2 -Wall -I../src -I. $(STATIC) $(DEBUG)
-
-TESTS_SRC_C=$(wildcard t_*.c)
-TESTS_C=$(TESTS_SRC_C:.c=)
-
-TESTS_SRC=$(TST_SRC_C) $(TST_SRC_CPP)
-TESTS=$(TESTS_C) $(TESTS_CPP)
+TESTS_SRC=$(wildcard t_*.c)
+TESTS_RAW=$(TESTS_SRC:.c=)
+TESTS=$(TESTS_SRC:.c=$(_EXE))
 
 # targets
 all: $(TESTS)
@@ -32,11 +30,14 @@ MAKEFLAGS += --no-builtin-rules
 %.o: %.c ../src/val.h
 	$(CC) $(CFLAGS) -o $*.o -c $< 
 
-%: %.o 
+%$(_EXE): %.o 
 	$(CC) -o $* $< $(LIBS)
 
-.PRECIOUS: %.o
+%.obj: %.c ../src/val.h
+	$(CC) $(CFLAGS) -o $*.obj -c $< 
+
+.PRECIOUS: %.o %.obj
 
 clean:
-	rm -f $(TESTS) $(TESTS:=.exe) $(TESTS:=.o) test.log functions.o
+	rm -f $(TESTS_RAW) $(TESTS_RAW:=.exe) $(TESTS_RAW:=.o) test.log functions.o
 

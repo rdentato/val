@@ -23,14 +23,14 @@ tstsuite("Val Library Value Extraction", value_extraction) {
         tstsection("Double Extraction") {
             tstcheck(valtodouble(doubleVal) == d, "Double value should be extracted correctly");
             // Testing conversion from int to double
-            tstcheck(valtosignedint(signedIntVal) == (double)si, "Signed int should convert to double");
+            tstcheck(valtoint(signedIntVal) == (double)si, "Signed int should convert to double");
             tstcheck(valtodouble(unsignedIntVal) == (double)ui, "Unsigned int should convert to double");
         }
         
         tstsection("Signed Integer Extraction") {
-            tstcheck(valtosignedint(signedIntVal) == si, "Signed int should be extracted correctly");
+            tstcheck(valtoint(signedIntVal) == si, "Signed int should be extracted correctly");
             // Testing conversion from double to int
-            tstcheck(valtosignedint(doubleVal) == (int)d, "Double should convert to signed int");
+            tstcheck(valtoint(doubleVal) == (int)d, "Double should convert to signed int");
             tstcheck(valtounsignedint(unsignedIntVal) == (unsigned int)ui, "Unsigned int should convert to signed int");
         }
         
@@ -61,14 +61,14 @@ tstsuite("Val Library Value Extraction", value_extraction) {
         val_t charPtrVal = val(str);
         
         tstsection("Raw Pointer Extraction") {
-            tstcheck(valtopointer(ptrVal) == ptr, "Generic pointer should be extracted correctly");
-            tstcheck(valtopointer(charPtrVal) == str, "Char pointer should be extracted correctly");
+            tstcheck(valtoptr(ptrVal) == ptr, "Generic pointer should be extracted correctly");
+            tstcheck(valtoptr(charPtrVal) == str, "Char pointer should be extracted correctly");
         }
         
         tstsection("Pointer Tag Extraction") {
             // Assuming pointer types are tagged based on their defined order
-            tstcheck(valpointertag(charPtrVal) == VAL_PTRTAG_CHAR, "Char pointer should have tag %016lX, (%016lX)",VAL_PTRTAG_CHAR,valpointertag(charPtrVal));
-            tstcheck(valpointertag(ptrVal) == VAL_PTRTAG_VOID, "Generic pointer should have tag %016lX, (%016lX)",VAL_PTRTAG_VOID,valpointertag(ptrVal));
+            tstcheck(valptrtype(charPtrVal) == VAL_PTR_CHAR, "Char pointer should have tag %016lX, (%016lX)",VAL_PTR_CHAR,valptrtype(charPtrVal));
+            tstcheck(valptrtype(ptrVal) == VAL_PTR_VOID, "Generic pointer should have tag %016lX, (%016lX)",VAL_PTR_VOID,valptrtype(ptrVal));
         }
         
         free(ptr);
@@ -84,7 +84,7 @@ tstsuite("Val Library Value Extraction", value_extraction) {
             tstnote("Testing nil value conversions");
             // These are implementation-dependent but should not crash
             valtodouble(nilVal);
-            valtosignedint(nilVal);
+            valtoint(nilVal);
             valtounsignedint(nilVal);
             valtobool(nilVal);
         }
@@ -94,7 +94,7 @@ tstsuite("Val Library Value Extraction", value_extraction) {
             tstnote("Testing constant value conversions");
             // These are implementation-dependent but should not crash
             valtodouble(constVal);
-            valtosignedint(constVal);
+            valtoint(constVal);
             valtounsignedint(constVal);
             valtobool(constVal);
         }
