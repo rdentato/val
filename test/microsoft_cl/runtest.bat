@@ -22,8 +22,8 @@ rem -----------------------------------------------------------
 rem No argument: compile each t_*.c from parent and run them
 rem -----------------------------------------------------------
 
-rem Delete any existing log so we start fresh (silent if it doesn't exist)
-del /Q test.log 2>nul
+rem Initialize test.log
+echo START %DATE% %TIME% > test.log
 
 rem Step 1: Compile all t_*.c from parent directory, adding include paths and using C11
 for %%F in ("..\t_*.c") do (
@@ -36,5 +36,20 @@ for %%E in (t_*.exe) do (
     echo Running %%~nxE...
     "%%~fE" 2>>test.log
 )
+
+echo END %DATE% %TIME% >> test.log
+
+rem Step 3: Count PASS/FAIL
+echo Checking results
+set /a PASS_COUNT=0
+set /a FAIL_COUNT=0
+
+for /f "delims=" %%L in (test.log) do (
+    :: echo %%L
+    echo "%%L" | findstr /c:" PASS|" >nul && set /a PASS_COUNT+=1
+    echo "%%L" | findstr /c:" FAIL|" >nul && set /a FAIL_COUNT+=1
+)
+
+echo TOTAL: %FAIL_COUNT% FAIL : %PASS_COUNT% PASS >> test.log
 
 echo All programs have run.  Stderr output (if any) is in test.log.

@@ -78,10 +78,11 @@ tstsuite("Val Library Type Checking", type_checking) {
 
     tstcase("Pointer Type Checking") {
         void *ptr = malloc(10);
-        val_t ptrVal = val(ptr);
         char *str = "hello";
+
+        val_t ptrVal = val(ptr);
         val_t charPtrVal = val(str);
-        
+
         tstsection("Generic Pointer Checking") {
             tstcheck(valisptr(ptrVal), "Generic pointer should be identified as a pointer");
             tstcheck(valisptr(charPtrVal), "Char pointer should be identified as a pointer");

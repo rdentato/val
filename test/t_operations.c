@@ -28,7 +28,8 @@ tstsuite("Val Library Operations", operations) {
             char str[] = "hello";
             tstcheck(valeq(val(str), val(str)), "Same pointers should be equal");
             tstcheck(!valeq(val(str), val("hello")), "Different pointers with same content should not be equal");
-            tstcheck(valcmp(str,"hello") == 0);
+            tstcheck(valcmp(str,val("hello")) == 0,"Expected 0 got %d",valcmp(str,val("hello")));
+            tstcheck(valcmp(str,"hello") == 0,"Expected 0 got %d",valcmp(str,val("hello")));
             
             // Special values
             tstcheck(valeq(valnil, valnil), "valnil should equal valnil");

@@ -16,7 +16,7 @@
 
 #ifdef __POCC__
   /* Pelles pocc compiler */
-  #pragma warn(disable:2014)
+  //#pragma warn(disable:2014)
   #pragma warn(disable:2250)
   #pragma warn(disable:2287)
   #pragma warn(disable:2804)
