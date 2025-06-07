@@ -52,6 +52,11 @@ typedef struct {uint64_t v;} val_t;
 static_assert(sizeof(val_t) == sizeof(uint64_t), "Wrong size for val_t");
 static_assert(sizeof(val_t) == 8, "Wrong size for uint64_t");
 
+typedef struct {int32_t v;} val_dummy_t;
+
+static_assert(sizeof(val_dummy_t) == sizeof(int32_t), "Wrong size for val_dummy_t");
+static_assert(sizeof(val_dummy_t) == 4, "Wrong size for int32_t");
+
 // ==== Numbers
 // All numbers are stored as a double floating point.
 // A value v is NaN-boxed if  (v & VAL_NAN_MASK) == VAL_NAN_MASK
@@ -294,11 +299,11 @@ static inline uint64_t val_ptrtype(val_t v) {
 #define val_1(_,x,...)   x
 
 #define valtagptr(...)  val_tagptr_(val_x(val_0(__VA_ARGS__)),\
-                                    val_x(val_1(__VA_ARGS__,(signed char)'4')))
+                                    val_x(val_1(__VA_ARGS__,(const char *)val_emptystr)))
 
 #define val_tagptr_(v,t) _Generic((t), \
-                             int: val_tagptr_set(val(v),(int)t), \
-                     signed char: val_tagptr_get(val(v)) \
+                             int: val_tagptr_set(val(v),(int)((uintptr_t)(t))), \
+                    const char *: val_tagptr_get(val(v)) \
                          )
 
 static inline val_t val_tagptr_set(val_t v, int tag) {
