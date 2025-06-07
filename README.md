@@ -20,7 +20,6 @@ All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 | Linux           | clang 14.0.0    | 64-bits and 32-bits targets |
 | MS Windows 11   | Mingw64 15.1.0  | 64-bits and 32-bits targets |
 | MS Windows 11   | MS cl 19.44     | /std:C11                    |
-| MS Windows 11   | Pelles C 13.0   | 64-bits and 32-bits targets |
 
 ---
 
