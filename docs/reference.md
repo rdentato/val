@@ -25,7 +25,7 @@
     - [`_Bool valtobool(val_t v)`](#_bool-valtoboolval_t-v)
     - [`void *valtoptr(val_t v)`](#void-valtoptrval_t-v)
   - [Pointer Operations](#pointer-operations)
-    - [`int64_t valptrtype(val_t v)`](#int64_t-valptrtypeval_t-v)
+    - [`uint64_t valptrtype(val_t v)`](#uint64_t-valptrtypeval_t-v)
     - [`val_t valtagptr(val_t p, int tag)`, `int valtagptr(val_t v)`](#val_t-valtagptrval_t-p-int-tag-int-valtagptrval_t-v)
     - [Custom pointers](#custom-pointers)
   - [Comparison and Hashing](#comparison-and-hashing)
@@ -203,7 +203,7 @@ if (ptr != NULL) {
 
 ## Pointer Operations
 
-### `int64_t valptrtype(val_t v)`
+### `uint64_t valptrtype(val_t v)`
 **Usage**: Returns the pointer type, or 0 if not a pointer.
 ```c
 uint64_t type = valptrtype(v);
