@@ -357,7 +357,7 @@ static inline int val_cmp(val_t a, val_t b) {
   }
   
   if (sa != val_emptystr) {
-    if (valischarptr(b)) sb = valtoptr(a);
+    if (valischarptr(b)) sb = valtoptr(b);
     else if (valischarptrptr(b)) {
       char **sb_ptr = valtoptr(b);
       sb = sb_ptr ? *sb_ptr : NULL;
@@ -366,7 +366,8 @@ static inline int val_cmp(val_t a, val_t b) {
     if (sb != val_emptystr) {
       if (sa == NULL) sa = val_emptystr; // / To avoid calling strcmp
       if (sb == NULL) sb = val_emptystr; // \ with NULL arguments
-      return strcmp(sa,sb);
+      int ret = strcmp(sa,sb);
+      return ret;
     }
   }
 
@@ -376,8 +377,8 @@ static inline int val_cmp(val_t a, val_t b) {
     return (da > db)? 1 : (da < db) ? -1 : 0 ;
   }
   
-  if (valisdouble(a)) return  1; // / Numbers are lower than
-  if (valisdouble(b)) return -1; // \ any other type
+  if (valisdouble(a)) return -1; // / Numbers are lower than
+  if (valisdouble(b)) return  1; // \ any other type
 
   return (a.v > b.v)? 1 : (a.v < b.v) ? -1 : 0 ;
 }
