@@ -367,7 +367,7 @@ static inline int val_cmp(val_t a, val_t b) {
     if (sb != val_emptystr) {
       if (sa == NULL) sa = val_emptystr; // / To avoid calling strcmp
       if (sb == NULL) sb = val_emptystr; // \ with NULL arguments
-      fprintf(stderr,"a: %016" PRIX64 " b: %016" PRIX64 "\n",a.v,b.v);
+      /// fprintf(stderr,"a: %016" PRIX64 " b: %016" PRIX64 "\n",a.v,b.v);
       int ret = strcmp(sa,sb);
       return ret;
     }
