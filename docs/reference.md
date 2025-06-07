@@ -16,7 +16,7 @@
     - [`int valisint(val_t x)`](#int-valisintval_t-x)
     - [`int valisbool(val_t x)`](#int-valisboolval_t-x)
     - [`int valisnil(val_t x)`](#int-valisnilval_t-x)
-    - [`int valisconst(val_t x)`](#int-valisconstval_t-x)
+    - [`int valisconst(val_t x [, int32_t c])`](#int-valisconstval_t-x--int32_t-c)
     - [`int valisptr(val_t p [, int64_t type])`](#int-valisptrval_t-p--int64_t-type)
   - [Value Extraction](#value-extraction)
     - [`double valtodouble(val_t v)`](#double-valtodoubleval_t-v)
@@ -117,12 +117,20 @@ if (valisnil(v)) {
 }
 ```
 
-### `int valisconst(val_t x)`
-**Usage**: Returns non-zero if the value is a user-defined constant.
+### `int valisconst(val_t x [, int32_t c])`
+**Usage**: Returns non-zero if the value is a user-defined constant. If the second argument
+is specified, checks that the user constant `x` has the value `c`.
+
 ```c
 if (valisconst(v)) {
     printf("It's a user constant\n");
 }
+
+#define ITEM_LOST 0x123
+if (valisconst(v,ITEM_LOST)) {
+    printf("It's a lost item\n");
+}
+
 ```
 
 ### `int valisptr(val_t p [, int64_t type])`

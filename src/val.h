@@ -57,6 +57,11 @@ typedef struct {int32_t v;} val_dummy_t;
 static_assert(sizeof(val_dummy_t) == sizeof(int32_t), "Wrong size for val_dummy_t");
 static_assert(sizeof(val_dummy_t) == 4, "Wrong size for int32_t");
 
+// Some auxiliary macros for optional parameters
+#define val_x(...)     __VA_ARGS__
+#define val_0(x,...)     x
+#define val_1(_,x,...)   x
+
 // ==== Numbers
 // All numbers are stored as a double floating point.
 // A value v is NaN-boxed if  (v & VAL_NAN_MASK) == VAL_NAN_MASK
@@ -103,11 +108,6 @@ static const val_t valtrue  = {VAL_FALSE | 1};
 static const val_t    valnil = {VAL_NIL};
 
 #define valisnil(x)   ((val(x).v == VAL_NIL))
-
-// User defined constants
-#define valconst(x)   ((val_t){ VAL_CONST_0 | ((x) & VAL_32BIT_MASK)})
-
-#define valisconst(x) ((val(x).v & VAL_CONST_MASK) == VAL_CONST_0)
 
 // ==== POINTERS
 #define VAL_PTR_MASK    ((uint64_t)0xFFF8000000000000)
@@ -192,6 +192,7 @@ static inline val_t val_fromval(val_t v)        {return v;}
 
 #define val_from(x) _Generic((x), int: val_fromint,        \
                                  char: val_fromint,        \
+                          signed char: val_fromint,        \
                                 short: val_fromint,        \
                                  long: val_fromint,        \
                             long long: val_fromint,        \
@@ -248,6 +249,30 @@ static inline  _Bool val_tobool(val_t v)  {
   else return ((v.v & VAL_32BIT_MASK) != 0);
 }
 
+
+// User defined constants
+#define valconst(x)   ((val_t){ VAL_CONST_0 | ((x) & VAL_32BIT_MASK)})
+
+#define valisconst(...) val_isconst_(val_x(val_0(__VA_ARGS__)),\
+                                     val_x(val_1(__VA_ARGS__,val_emptystr)))
+
+#define val_isconst_(v,c) _Generic((c), \
+                                 default: val_isconst(v),  \
+                                     int: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                                    char: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                             signed char: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                                   short: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                                    long: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                               long long: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                            unsigned int: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                           unsigned char: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                          unsigned short: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                           unsigned long: valeq(v,valconst((int32_t)((uintptr_t)(c)))), \
+                      unsigned long long: valeq(v,valconst((int32_t)((uintptr_t)(c))))  \
+                          )
+
+int val_isconst(val_t x) { return ((val(x).v & VAL_CONST_MASK) == VAL_CONST_0);}
+
 // ==== Pointer tagging
 // Except for `void *` and `char *`, any pointer can be *tagged* with 
 // a number between 0 and 7 (0 is the default tag for pointers).
@@ -256,12 +281,14 @@ static inline  _Bool val_tobool(val_t v)  {
 
 // Checks that there are at least three zero bits in memory aligned pointers
 #ifdef _MSC_VER
-  // Make up for lack of `max_align_t` in MS cl
-  #define max_align_t double
+  // Make up for lack of `max_align_t` in Microsoft cl
+  #define val_align_t double
+#else 
+  #define val_align_t max_align_t
 #endif
 
 #define VAL_MIN_ALIGN 8
-static_assert(alignof(max_align_t) >= VAL_MIN_ALIGN, "Alignment requirements not matched");
+static_assert(alignof(val_align_t) >= VAL_MIN_ALIGN, "Alignment requirements not met");
 
 static inline int val_check_taggable_ptr(val_t v) {
   // Not a pointer
@@ -274,7 +301,7 @@ static inline int val_check_taggable_ptr(val_t v) {
   return 1;
 }
 
-// Tags are 3 bits long
+// We expect room for VAL_MIN_ALIGN values
 #define VAL_TAG_MASK  ((uint64_t)(VAL_MIN_ALIGN-1))
 
 #define valtoptr(v) val_toptr(val(v))
@@ -291,19 +318,15 @@ static inline   void *val_toptr(val_t v) {
 
 #define valptrtype(v) val_ptrtype(val(v))
 static inline uint64_t val_ptrtype(val_t v) {
-  return  valisptr(v) ? (v.v & VAL_TYPE_MASK) : 0;
+  return  val_is_any_ptr(v) ? (v.v & VAL_TYPE_MASK) : 0;
 }
 
-#define val_x(...)     __VA_ARGS__
-#define val_0(x,...)     x
-#define val_1(_,x,...)   x
-
 #define valtagptr(...)  val_tagptr_(val_x(val_0(__VA_ARGS__)),\
-                                    val_x(val_1(__VA_ARGS__,(const char *)val_emptystr)))
+                                    val_x(val_1(__VA_ARGS__,val_emptystr)))
 
 #define val_tagptr_(v,t) _Generic((t), \
                              int: val_tagptr_set(val(v),(int)((uintptr_t)(t))), \
-                    const char *: val_tagptr_get(val(v)) \
+                         default: val_tagptr_get(val(v)) \
                          )
 
 static inline val_t val_tagptr_set(val_t v, int tag) {
@@ -397,7 +420,7 @@ static inline uint32_t val_hash(val_t v) {
 // This is needed to avoid warnings about unused static variables.
 static inline uint64_t val_usestatic()
 {
-  return (valnil.v | valtrue.v | valfalse.v | valnullptr.v);
+  return (valnil.v | valtrue.v | valfalse.v | valnullptr.v | (uintptr_t)val_emptystr);
 }
 
 #endif

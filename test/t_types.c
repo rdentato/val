@@ -60,6 +60,22 @@ tstsuite("Val Library Type Checking", type_checking) {
         tstcheck(!valisconst(valnil), "valnil should not be identified as a custom constant");
     }
     
+    #define ITEM_LOST 123
+    #define ITEM_FOUND 435
+    tstcase("Chec exact constants") {
+      val_t item_lost = valconst(ITEM_LOST);
+      val_t item_found = valconst(ITEM_FOUND);
+
+      tstcheck( valisconst(item_lost));
+      tstcheck( valisconst(item_lost,ITEM_LOST));
+
+      tstcheck( !valeq(item_lost,item_found));
+      tstcheck( !valisconst(item_lost,ITEM_FOUND));
+
+      tstcheck( valeq(item_lost,valconst(ITEM_LOST)));
+      tstcheck( !valeq(item_lost,ITEM_LOST));
+    }
+
     tstcase("Pointer Type Checking") {
         void *ptr = malloc(10);
         val_t ptrVal = val(ptr);
