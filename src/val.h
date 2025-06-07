@@ -272,7 +272,7 @@ static inline  _Bool val_tobool(val_t v)  {
                       unsigned long long: valeq(v,valconst((int32_t)((uintptr_t)(c))))  \
                           )
 
-int val_isconst(val_t x) { return ((val(x).v & VAL_CONST_MASK) == VAL_CONST_0);}
+static inline int val_isconst(val_t x) { return ((val(x).v & VAL_CONST_MASK) == VAL_CONST_0);}
 
 // ==== Pointer tagging
 // Except for `void *` and `char *`, any pointer can be *tagged* with 
