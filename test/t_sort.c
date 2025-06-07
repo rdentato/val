@@ -56,4 +56,13 @@ tstsuite("Sorting") {
       if (valischarptr(arr[i-1]) && valischarptr(arr[i]))
         tstcheck(strcmp(valtoptr(arr[i-1]),valtoptr(arr[i])) <= 0);
     }
+
+        // Free allocated strings
+    for (int i = 0; i < N; i++) {
+        if (valischarptr(arr[i])) {
+            free(valtoptr(arr[i]));
+        }
+    }
+
+
 }
