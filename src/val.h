@@ -207,10 +207,8 @@ static inline val_t val_fromval(val_t v)        {return v;}
                                 _Bool: val_frombool,       \
                                double: val_fromdouble,     \
                                 float: val_fromfloat,      \
-                      unsigned char *: val_fromcharptr,    \
-                        signed char *: val_fromcharptr,    \
-                               char *: val_fromcharptr,    \
                          valptr_buf_t: val_frombufptr,     \
+                           valptr_5_t: val_fromptr_5,      \
                            valptr_4_t: val_fromptr_4,      \
                            valptr_3_t: val_fromptr_3,      \
                            valptr_2_t: val_fromptr_2,      \
