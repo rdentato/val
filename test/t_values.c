@@ -67,8 +67,8 @@ tstsuite("Val Library Value Extraction", value_extraction) {
         
         tstsection("Pointer Tag Extraction") {
             // Assuming pointer types are tagged based on their defined order
-            tstcheck(valptrtype(charPtrVal) == VAL_PTR_CHAR, "Char pointer should have tag %016" PRIX64 ", (%016" PRIX64 ")",VAL_PTR_CHAR,valptrtype(charPtrVal));
-            tstcheck(valptrtype(ptrVal) == VAL_PTR_VOID, "Generic pointer should have tag %016" PRIX64 ", (%016" PRIX64 ")",VAL_PTR_VOID,valptrtype(ptrVal));
+            tstcheck(valptrtype(charPtrVal) == VALPTR_CHAR, "Char pointer should have tag %016" PRIX64 ", (%016" PRIX64 ")",VALPTR_CHAR,valptrtype(charPtrVal));
+            tstcheck(valptrtype(ptrVal) == VALPTR_VOID, "Generic pointer should have tag %016" PRIX64 ", (%016" PRIX64 ")",VALPTR_VOID,valptrtype(ptrVal));
         }
         
         free(ptr);

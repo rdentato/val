@@ -1,9 +1,9 @@
 //  SPDX-FileCopyrightText: © 2025 Remo Dentato <rdentato@gmail.com>
 //  SPDX-License-Identifier: MIT
-//  PackageVersion: 0.3.5 Beta
+//  PackageVersion: 0.3.7 Beta
 
 #ifndef VAL_VERSION
-#define VAL_VERSION 0x0003005B
+#define VAL_VERSION 0x0003007B
 
 #include <stdint.h>
 #include <string.h>
@@ -111,24 +111,26 @@ static const val_t    valnil = {VAL_NIL};
 #define valisnil(x)   ((val(x).v == VAL_NIL))
 
 // ==== POINTERS
-#define VAL_PTR_MASK    ((uint64_t)0xFFF8000000000000)
+#define VAL_PTR_MASK  ((uint64_t)0xFFF8000000000000)
 
-#define VAL_PTR_VOID    ((uint64_t)0x7FF8000000000000)
-#define VAL_PTR_CHAR    ((uint64_t)0x7FF9000000000000)
-#define VAL_PTR_CHARPTR ((uint64_t)0x7FFA000000000000)
+#define VALPTR_VOID   ((uint64_t)0x7FF8000000000000)
+#define VALPTR_CHAR   ((uint64_t)0x7FF9000000000000)
 
-// These are reserved for interactions with other libraries.
-#define VAL_PTR_5       ((uint64_t)0x7FFB000000000000)
+// Buffers are structures whose first field is a char *
+#define VALPTR_BUF    ((uint64_t)0x7FFA000000000000)
+typedef struct valptr_buf_s *valptr_buf_t; 
 
+// Reserved
+#define VALPTR_5      ((uint64_t)0x7FFB000000000000)
 #ifndef valptr_5_t
 typedef struct valptr_5_s *valptr_5_t; 
 #endif
 
 // These can be user defined.
-#define VAL_PTR_4      ((uint64_t)0x7FFC000000000000)
-#define VAL_PTR_3      ((uint64_t)0x7FFD000000000000)
-#define VAL_PTR_2      ((uint64_t)0x7FFE000000000000)
-#define VAL_PTR_1      ((uint64_t)0x7FFF000000000000)
+#define VALPTR_4      ((uint64_t)0x7FFC000000000000)
+#define VALPTR_3      ((uint64_t)0x7FFD000000000000)
+#define VALPTR_2      ((uint64_t)0x7FFE000000000000)
+#define VALPTR_1      ((uint64_t)0x7FFF000000000000)
 
 #ifndef valptr_4_t
 typedef struct valptr_4_s *valptr_4_t; 
@@ -143,19 +145,19 @@ typedef struct valptr_2_s *valptr_2_t;
 typedef struct valptr_1_s *valptr_1_t; 
 #endif
 
-#define val_is_any_ptr(v) ((v.v & VAL_PTR_MASK)  == VAL_PTR_VOID)
+#define val_is_any_ptr(v) ((v.v & VAL_PTR_MASK)  == VALPTR_VOID)
 #define valisptr(p,...) val_isptr(val(p), __VA_ARGS__ +0)
 static inline int val_isptr(val_t v, uint64_t ptr_type)  {
     if (ptr_type == 0) return val_is_any_ptr(v);
   else            return ((v.v & VAL_TYPE_MASK)  == ptr_type); 
 }
 
-#define valisvoidptr(x)     ((val(x).v & VAL_TYPE_MASK) == VAL_PTR_VOID)
-#define valischarptr(x)     ((val(x).v & VAL_TYPE_MASK) == VAL_PTR_CHAR)
-#define valischarptrptr(x)  ((val(x).v & VAL_TYPE_MASK) == VAL_PTR_CHARPTR)
+#define valisvoidptr(x)     ((val(x).v & VAL_TYPE_MASK) == VALPTR_VOID)
+#define valischarptr(x)     ((val(x).v & VAL_TYPE_MASK) == VALPTR_CHAR)
+#define valisbufptr(x)      ((val(x).v & VAL_TYPE_MASK) == VALPTR_BUF)
 
 // The val_t corresponding of the C pointer NULL
-static const val_t valnullptr = {VAL_PTR_VOID};
+static const val_t valnullptr = {VALPTR_VOID};
 
 #define valisnullptr(x)  (valtoptr(x) == NULL)
 
@@ -176,14 +178,14 @@ static inline val_t val_fromuint(uint64_t v)    {return val_fromdouble((double)v
 
 // POINTERS
 
-static inline val_t val_frompvoidtr(void *v)    {val_t ret; ret.v = VAL_PTR_VOID     | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromcharptr(void *v)    {val_t ret; ret.v = VAL_PTR_CHAR     | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromcharptrptr(void *v) {val_t ret; ret.v = VAL_PTR_CHARPTR  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_5(void *v)      {val_t ret; ret.v = VAL_PTR_5        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_4(void *v)      {val_t ret; ret.v = VAL_PTR_4        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_3(void *v)      {val_t ret; ret.v = VAL_PTR_3        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_2(void *v)      {val_t ret; ret.v = VAL_PTR_2        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_1(void *v)      {val_t ret; ret.v = VAL_PTR_1        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_frompvoidtr(void *v)    {val_t ret; ret.v = VALPTR_VOID     | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromcharptr(void *v)    {val_t ret; ret.v = VALPTR_CHAR     | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_frombufptr(void *v)     {val_t ret; ret.v = VALPTR_BUF      | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_5(void *v)      {val_t ret; ret.v = VALPTR_5        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_4(void *v)      {val_t ret; ret.v = VALPTR_4        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_3(void *v)      {val_t ret; ret.v = VALPTR_3        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_2(void *v)      {val_t ret; ret.v = VALPTR_2        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_1(void *v)      {val_t ret; ret.v = VALPTR_1        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 
 // BOOLEAN
 static inline val_t val_frombool(_Bool v)       {val_t ret; ret.v = VAL_FALSE | ((uint64_t)(!!(v))); return ret;}
@@ -208,14 +210,11 @@ static inline val_t val_fromval(val_t v)        {return v;}
                       unsigned char *: val_fromcharptr,    \
                         signed char *: val_fromcharptr,    \
                                char *: val_fromcharptr,    \
-                     unsigned char **: val_fromcharptrptr, \
-                       signed char **: val_fromcharptrptr, \
-                              char **: val_fromcharptrptr, \
-                       valptr_5_t: val_fromptr_5,          \
-                       valptr_4_t: val_fromptr_4,          \
-                       valptr_3_t: val_fromptr_3,          \
-                       valptr_2_t: val_fromptr_2,          \
-                       valptr_1_t: val_fromptr_1,          \
+                         valptr_buf_t: val_frombufptr,     \
+                           valptr_4_t: val_fromptr_4,      \
+                           valptr_3_t: val_fromptr_3,      \
+                           valptr_2_t: val_fromptr_2,      \
+                           valptr_1_t: val_fromptr_1,      \
                                void *: val_frompvoidtr,    \
                                 val_t: val_fromval  ,      \
                               default: val_frompvoidtr     \
@@ -293,10 +292,10 @@ static_assert(alignof(val_align_t) >= VAL_MIN_ALIGN, "Alignment requirements not
 
 static inline int val_check_taggable_ptr(val_t v) {
   // Not a pointer
-  if ((v.v & VAL_PTR_MASK) != VAL_PTR_VOID) return -1; 
+  if ((v.v & VAL_PTR_MASK) != VALPTR_VOID) return -1; 
 
   // It's either a char or void pointer can't be tagged
-  if ((v.v & VAL_TYPE_MASK) <= VAL_PTR_CHAR)  return 0;
+  if ((v.v & VAL_TYPE_MASK) <= VALPTR_CHAR)  return 0;
 
   // A taggable pointer
   return 1;
@@ -352,14 +351,14 @@ static inline int val_cmp(val_t a, val_t b) {
   char *sb = val_emptystr;
 
   if (valischarptr(a)) sa = valtoptr(a);
-  else if (valischarptrptr(a)) {
+  else if (valisbufptr(a)) {
     char **sa_ptr = valtoptr(a);
     sa = sa_ptr ? *sa_ptr : NULL;
   }
   
   if (sa != val_emptystr) {
     if (valischarptr(b)) sb = valtoptr(b);
-    else if (valischarptrptr(b)) {
+    else if (valisbufptr(b)) {
       char **sb_ptr = valtoptr(b);
       sb = sb_ptr ? *sb_ptr : NULL;
     }
@@ -392,7 +391,7 @@ static inline uint32_t val_hash(val_t v) {
   char *s = val_emptystr;
 
   if (valischarptr(v)) s = valtoptr(v);
-  else if (valischarptrptr(v)) {
+  else if (valisbufptr(v)) {
     char **s_ptr = valtoptr(v);
     s = s_ptr ? *s_ptr : NULL;
   }

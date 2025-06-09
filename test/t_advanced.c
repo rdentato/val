@@ -4,16 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 
-// Define custom pointer types before including val.h
-#define valpointer_1_t FILE *
-#define PTRTAG_FILE VAL_PTRTAG_1
-
 #include "val.h"
-
-// Or after as long as it is a pointer to a structure (the most common case)
-struct  valpointer_2_s { int x; int y; };
-#define point_t valpointer_2_t 
-#define PTRTAG_POINT VAL_PTRTAG_2
 
 tstsuite("Val Library Advanced Use Cases", advanced) {
     tstcase("48-bit Integer Limits") {

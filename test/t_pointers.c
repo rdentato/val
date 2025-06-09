@@ -5,15 +5,15 @@
 #include <stdint.h>
 
 // Define custom pointer types before including val.h
+// if you don't know what do they point to.
 #define valptr_1_t FILE *
-#define PTRTAG_FILE VAL_PTR_1
+#define PTRTAG_FILE VALPTR_1
 
 #include "val.h"
 
-// Or after as long as it is a pointer to a structure (the most common case)
-struct  valptr_2_s { int x; int y; };
-#define point_t valptr_2_t 
-#define PTRTAG_POINT VAL_PTR_2
+// Or after inclusion to define your own struct (the most common case)
+typedef struct  valptr_2_s { int x; int y; } *point_t;
+#define PTRTAG_POINT VALPTR_2
 
 tstsuite("Val Library pointers", advanced) {
     tstcase("48-bit Pointer Storage") {
@@ -23,8 +23,8 @@ tstsuite("Val Library pointers", advanced) {
         
         tstcheck(valisptr(ptr_val), "Pointer should be identified as a pointer");
         tstcheck(valtoptr(ptr_val) == ptr, "Pointer should be extracted correctly");
-        tstcheck(valisptr(ptr_val, VAL_PTR_VOID), "Pointer should be identified as a void pointer");
-        tstcheck(!valisptr(ptr_val, VAL_PTR_CHAR), "Pointer should not be identified as a char pointer");
+        tstcheck(valisptr(ptr_val, VALPTR_VOID), "Pointer should be identified as a void pointer");
+        tstcheck(!valisptr(ptr_val, VALPTR_CHAR), "Pointer should not be identified as a char pointer");
         
         free(ptr);
     }
