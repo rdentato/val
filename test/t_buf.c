@@ -61,10 +61,10 @@ tstsuite("Buffers") {
       strcpy(b2->buf,"World"); b2->len=5;
       
       tstcheck(strcmp(b->buf,"Hello") == 0);
-      tstcheck(strlen(b->buf) == b->len);
+      tstcheck(strlen(b->buf) == (size_t)(b->len));
 
       tstcheck(strcmp(b2->buf,"World") == 0);
-      tstcheck(strlen(b2->buf) == b->len);
+      tstcheck(strlen(b2->buf) == (size_t)(b->len));
 
       tstcheck(valcmp(bufVal,buf2Val) != 0);
       tstcheck(valcmp(bufVal,"Hello") == 0); // Mix buffer and strings
