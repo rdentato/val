@@ -11,12 +11,14 @@
   - [Value Creation](#value-creation)
     - [`val_t val(x)`](#val_t-valx)
     - [`val_t valconst(int32_t x)`](#val_t-valconstint32_t-x)
+    - [`val_t vallabel(char *s)`](#val_t-vallabelchar-s)
   - [Type Checking](#type-checking)
     - [`int valisdouble(val_t x)`](#int-valisdoubleval_t-x)
     - [`int valisint(val_t x)`](#int-valisintval_t-x)
     - [`int valisbool(val_t x)`](#int-valisboolval_t-x)
     - [`int valisnil(val_t x)`](#int-valisnilval_t-x)
     - [`int valisconst(val_t x [, int32_t c])`](#int-valisconstval_t-x--int32_t-c)
+    - [`int valislabel(val_t x [, char *s])`](#int-valislabelval_t-x--char-s)
     - [`int valisptr(val_t p [, int64_t type])`](#int-valisptrval_t-p--int64_t-type)
   - [Value Extraction](#value-extraction)
     - [`double valtodouble(val_t v)`](#double-valtodoubleval_t-v)
@@ -24,6 +26,7 @@
     - [`uint64_t valtounsignedint(val_t v)`](#uint64_t-valtounsignedintval_t-v)
     - [`_Bool valtobool(val_t v)`](#_bool-valtoboolval_t-v)
     - [`void *valtoptr(val_t v)`](#void-valtoptrval_t-v)
+    - [`const char *valtostring(val_t v [, char *buffer] [,char *format])`](#const-char-valtostringval_t-v--char-buffer-char-format)
   - [Pointer Operations](#pointer-operations)
     - [`uint64_t valptrtype(val_t v)`](#uint64_t-valptrtypeval_t-v)
     - [`val_t valtagptr(val_t p, int tag)`, `int valtagptr(val_t v)`](#val_t-valtagptrval_t-p-int-tag-int-valtagptrval_t-v)
@@ -83,6 +86,22 @@ val_t v4 = val("hello");      // char pointer
 val_t my_const = valconst(0x12345678);
 ```
 
+### `val_t vallabel(char *s)`
+**Usage**: Creates a constant from a *label* which is guaranteed to be different from any other value.
+A *label* is a string up to eight characters comprising only digits, upper case and lower case letters and the
+underscore ('_'). It can be converted back to a string using the `valtostring()` function.
+
+```c
+val_t my_const = vallabel("blk_id");
+if (valislabel(my_const)) {
+  char lbl[10];
+  printf("Label: %s\n",valtostring(my_const,lbl));
+}
+if (valcmp(my_const, "blk_id")) { // true
+  printf("Block id found\n");
+}
+```
+
 ## Type Checking
 
 ### `int valisdouble(val_t x)`
@@ -119,7 +138,7 @@ if (valisnil(v)) {
 
 ### `int valisconst(val_t x [, int32_t c])`
 **Usage**: Returns non-zero if the value is a user-defined constant. If the second argument
-is specified, checks that the user constant `x` has the value `c`.
+is specified, also checks that `x` has the value `c`.
 
 ```c
 if (valisconst(v)) {
@@ -128,6 +147,22 @@ if (valisconst(v)) {
 
 #define ITEM_LOST 0x123
 if (valisconst(v,ITEM_LOST)) {
+    printf("It's a lost item\n");
+}
+
+```
+
+### `int valislabel(val_t x [, char *s])`
+**Usage**: Returns non-zero if the value is a user-defined label. If the second argument
+is specified, also checks that the `x` is the label `s`.
+
+
+```c
+if (valislabel(v)) {
+    printf("It's a label\n");
+}
+
+if (valislabel(v,"itm_lost")) {
     printf("It's a lost item\n");
 }
 
@@ -207,6 +242,41 @@ void *ptr = valtoptr(v);
 if (ptr != NULL) {
     // use pointer
 }
+```
+
+### `const char *valtostring(val_t v [, char *buffer] [,char *format])`
+**Usage**: Returns a pointer to a string version of the value `v`.
+
+If a `buffer` (which must be large enough to accomodate the result) is provided it should be initialized to `""` (i.e. `buffer[0] = '\0'`).
+The `format` parameters is for printing numbers and can be any double format specifier for `printf()`. Defaults to `"%f"`.
+
+*WARNING*: Not providing the buffer makes the function non thread-safe.
+
+*WARNING*: Not providing the buffer limits the output to be max 30 characters long.
+
+*WARNING*: Only the return value must be used, the content of the provided buffer after the call is undefined.
+
+```c
+
+if (valisbool(v)) {
+  printf("%s\n",valtostr(v));   // NOT THREAD SAFE
+
+  char str_buf[10];
+  printf("%s\n",valtostr(v,str_buf)); // THREAD SAFE
+}
+
+if (valisdouble(v)) {
+  printf("%s\n",valtostr(v));               // NOT THREAD SAFE
+
+  printf("%s\n",valtostr(v,"%.2f"));        // NOT THREAD SAFE
+
+  printf("%s\n",valtostr(v,NULL, "%.2f"));  // NOT THREAD SAFE
+
+  char str_buf[10];
+  str_buf[0] = '\0';
+  printf("%s\n",valtostr(v,str_buf,"%.2f"));// THREAD SAFE
+}
+
 ```
 
 ## Pointer Operations

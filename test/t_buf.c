@@ -55,6 +55,8 @@ tstsuite("Buffers") {
       tstcheck(!valeq(buf2Val,b2));
       tstcheck(valtoptr(buf2Val) == valtoptr(b2));
 
+      tstcheck(valischarptr("Hello"),"val: %016" PRIX64 "",val("Hello").v);
+
       strcpy(b->buf,"Hello"); b->len=5;
       strcpy(b2->buf,"World"); b2->len=5;
       

@@ -1,9 +1,9 @@
 //  SPDX-FileCopyrightText: © 2025 Remo Dentato <rdentato@gmail.com>
 //  SPDX-License-Identifier: MIT
-//  PackageVersion: 0.3.7 Beta
+//  PackageVersion: 0.3.8 Beta
 
 #ifndef VAL_VERSION
-#define VAL_VERSION 0x0003007B
+#define VAL_VERSION 0x0003008B
 
 #include <stdint.h>
 #include <string.h>
@@ -13,6 +13,7 @@
 #include <stdalign.h>
 #include <inttypes.h>
 #include <stddef.h>
+#include <limits.h>
 
 // ## REFERENCES
 //
@@ -60,8 +61,9 @@ static_assert(sizeof(val_dummy_t) == 4, "Wrong size for int32_t");
 
 // Some auxiliary macros for optional parameters
 #define val_x(...)     __VA_ARGS__
-#define val_0(x,...)     x
-#define val_1(_,x,...)   x
+#define val_0(x,...)      x
+#define val_1(y,x,...)    x
+#define val_2(z,y,x,...)  x
 
 // ==== Numbers
 // All numbers are stored as a double floating point.
@@ -109,6 +111,79 @@ static const val_t valtrue  = {VAL_FALSE | 1};
 static const val_t    valnil = {VAL_NIL};
 
 #define valisnil(x)   ((val(x).v == VAL_NIL))
+
+// Labels (8 chars strings of upper/lower case, digits and '_')
+#define VAL_LABEL_NULL     ((uint64_t)0xFFF9FFFFFFFFFFFF)
+#define VAL_LABEL_0        ((uint64_t)0xFFF9000000000000)
+#define valislabelnull(x)  (val(x) == VAL_LABEL_NULL)
+
+
+
+  //             1         2         3     3   4         5         6
+  //   0         0         0         0     67  0         0         0
+  //  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+  // Note that character `\0` is mapped to 63
+
+static inline val_t vallabel(char *lbl_str) {
+  val_t lbl_val = {VAL_LABEL_NULL};
+  uint64_t lbl = ((uint64_t)0xFFFFFFFFFFFFFFFF); // All '\0'
+  char c;
+  if (lbl_str != NULL) {
+    int shift = 0;
+    for (int i = 0; i < 8 && ((c = *lbl_str) != '\0'); i++, lbl_str++) {
+
+      if ('0' <= c && c <= '9') c = (c & 0x0F);
+      else if ('A' <= c && c <= 'Z') c = (c & 0x1F) - 1 + 10;
+      else if ('a' <= c && c <= 'z') c = (c & 0x1F) - 1 + 37;
+      else if ('_' == c) c = 36;
+      else break; // Invalid characters signal the end of the label
+
+      lbl &= ~(0x3F << shift); // clear the space
+      lbl |=     (c << shift);
+      shift += 6;
+    }
+  }
+  lbl_val.v = VAL_LABEL_0 | (lbl & VAL_PAYLOAD_MASK);
+  return lbl_val;
+}
+
+static inline char *val_label_to_str(val_t v, char *lbl_str) {
+  uint64_t lbl;
+  int c;
+  char *lbl_start = lbl_str;
+
+  lbl = v.v & VAL_PAYLOAD_MASK;
+  
+  for (int i = 0; i<8 ; i++, lbl_str++) {
+    c = lbl & 0x3F;
+
+    if (c == 63) break; // '\0'
+    else if (c <  10) c += '0';
+    else if (c <  36) c += 'A' - 10;
+    else if (c <  37) c = '_';
+    else c += 'a' - 37;
+
+    *lbl_str = c;
+
+    lbl >>= 6;
+  }
+  *lbl_str = '\0';
+  return lbl_start;
+}
+
+#define valislabel(...)  val_islabel(val(val_0(__VA_ARGS__)), val_1(__VA_ARGS__,NULL))
+
+int val_islabel(val_t v, char *s) {
+  
+  if (!((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)) return 0;
+
+  if (s != NULL) {
+    char lbl_str[10];
+    return (strcmp(s,val_label_to_str(v,lbl_str)) == 0);
+  }
+  return 1;
+}
+
 
 // ==== POINTERS
 #define VAL_PTR_MASK  ((uint64_t)0xFFF8000000000000)
@@ -178,14 +253,14 @@ static inline val_t val_fromuint(uint64_t v)    {return val_fromdouble((double)v
 
 // POINTERS
 
-static inline val_t val_frompvoidtr(void *v)    {val_t ret; ret.v = VALPTR_VOID     | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromcharptr(void *v)    {val_t ret; ret.v = VALPTR_CHAR     | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_frombufptr(void *v)     {val_t ret; ret.v = VALPTR_BUF      | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_5(void *v)      {val_t ret; ret.v = VALPTR_5        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_4(void *v)      {val_t ret; ret.v = VALPTR_4        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_3(void *v)      {val_t ret; ret.v = VALPTR_3        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_2(void *v)      {val_t ret; ret.v = VALPTR_2        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_1(void *v)      {val_t ret; ret.v = VALPTR_1        | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_frompvoidtr(void *v)    {val_t ret; ret.v = VALPTR_VOID | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromcharptr(void *v)    {val_t ret; ret.v = VALPTR_CHAR | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_frombufptr(void *v)     {val_t ret; ret.v = VALPTR_BUF  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_5(void *v)      {val_t ret; ret.v = VALPTR_5    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_4(void *v)      {val_t ret; ret.v = VALPTR_4    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_3(void *v)      {val_t ret; ret.v = VALPTR_3    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_2(void *v)      {val_t ret; ret.v = VALPTR_2    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
+static inline val_t val_fromptr_1(void *v)      {val_t ret; ret.v = VALPTR_1    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 
 // BOOLEAN
 static inline val_t val_frombool(_Bool v)       {val_t ret; ret.v = VAL_FALSE | ((uint64_t)(!!(v))); return ret;}
@@ -350,11 +425,16 @@ static inline int val_tagptr_get(val_t v) {
 static inline int val_cmp(val_t a, val_t b) {
   char *sa = val_emptystr;
   char *sb = val_emptystr;
+  char lbl_str_a[10];
+  char lbl_str_b[10];
 
   if (valischarptr(a)) sa = valtoptr(a);
   else if (valisbufptr(a)) {
     char **sa_ptr = valtoptr(a);
     sa = sa_ptr ? *sa_ptr : NULL;
+  }
+  else if (valislabel(a)) {
+    sa = val_label_to_str(a,lbl_str_a);
   }
   
   if (sa != val_emptystr) {
@@ -362,6 +442,9 @@ static inline int val_cmp(val_t a, val_t b) {
     else if (valisbufptr(b)) {
       char **sb_ptr = valtoptr(b);
       sb = sb_ptr ? *sb_ptr : NULL;
+    }
+    else if (valislabel(b)) {
+      sb = val_label_to_str(b,lbl_str_b);
     }
 
     if (sb != val_emptystr) {
@@ -390,11 +473,15 @@ static inline uint32_t val_hash(val_t v) {
   uint32_t hash = (uint32_t)0x811c9dc5; // FNV1a INIT
 
   char *s = val_emptystr;
+  char lbl_str[10];
 
   if (valischarptr(v)) s = valtoptr(v);
   else if (valisbufptr(v)) {
     char **s_ptr = valtoptr(v);
     s = s_ptr ? *s_ptr : NULL;
+  }
+  else if (valislabel(v)) {
+    s = val_label_to_str(v,lbl_str);
   }
 
   if (s != val_emptystr) {
@@ -420,10 +507,53 @@ static inline uint32_t val_hash(val_t v) {
   return hash;
 }
 
+// WARNING: Using valtostring without providing a buffer makes it not thread safe!!!
+#define valtostring(...) val_tostring(val(val_0(__VA_ARGS__)), val_1(__VA_ARGS__,NULL), val_2(__VA_ARGS__ ,NULL, NULL))
+static inline const char *val_tostring(val_t v, char *str, char *fmt)
+{
+  static char str_buf[32];
+  str_buf[0] = '\0';
+
+  // Check if there are only two paramenters and the second one is a format specifier
+  if (fmt == NULL) { 
+    if (str != NULL) {
+      // Check if the string is a printf specifier for doubles
+      if (*str == '%') {
+        char *s = str+1;
+        while (*s && ((s-str) < 15) ) s++;
+        if (*s == '\0') switch (s[-1]) {
+          case 'e': case 'E': case 'f': case 'F':
+          case 'g': case 'G': case 'a': case 'A': 
+            fmt = str; str = NULL;
+        }
+      }
+    }
+    else fmt = "%f";
+  }
+
+  if (str == NULL) str = str_buf; 
+
+  *str = '\0';
+
+       if (valislabel(v))   val_label_to_str(v,str);
+  else if (valisdouble(v))  (str == str_buf)? snprintf(str, 32, fmt, valtodouble(v)) : sprintf(str, fmt, valtodouble(v));
+  else if (valisconst(v))   sprintf(str, "%08" PRIX32 , (uint32_t)(v.v & VAL_32BIT_MASK));
+  else if (valischarptr(v)) { char *p = valtoptr(v); return (p? p : val_emptystr); }
+  else if (valisbufptr(v))  { void *p = valtoptr(v); if (p != NULL) p = *(char **)p; return (p? p : val_emptystr); }
+  else if (valisptr(v))     sprintf(str,"%p",valtoptr(v));
+  else if (valisnil(v))     return "nil";
+  else if (valisbool(v))    return ((v.v & 1) ? "true" : "false");
+  else sprintf(str,"%016" PRIX64, v.v);
+
+  str_buf[30] = '\0';
+  return str;
+}
+
 // This is needed to avoid warnings about unused static variables.
 static inline uint64_t val_usestatic()
 {
   return (valnil.v | valtrue.v | valfalse.v | valnullptr.v | (uintptr_t)val_emptystr);
 }
+
 
 #endif
