@@ -24,10 +24,24 @@ tstsuite("Val Library labels") {
 
     tstcase("Wrong chars") {
       lbl = vallabel("A!B");
-      tstcheck(strcmp(valtostring(lbl,lbl_buf),"A") == 0);
+      tstcheck(strcmp(valtostring(lbl,lbl_buf),"A") == 0, "buf: %.8s",lbl_buf);
+
+      lbl = vallabel("A:B");
+      tstcheck(strcmp(valtostring(lbl,lbl_buf),"A") == 0, "buf: %.8s",lbl_buf);
 
       lbl = vallabel("!AB");
-      tstcheck(strcmp(valtostring(lbl,lbl_buf),"") == 0);
+      tstcheck(strcmp(valtostring(lbl,lbl_buf),"") == 0, "buf: %.8s",lbl_buf);
+    }
+
+    tstcase("Wrong length") {
+      lbl = vallabel("");
+      tstcheck(strcmp(valtostring(lbl,lbl_buf),"") == 0, "buf: %.8s",lbl_buf);
+
+      lbl = vallabel("01234567");
+      tstcheck(strcmp(valtostring(lbl,lbl_buf),"01234567") == 0, "buf: %.8s",lbl_buf);
+
+      lbl = vallabel("012345678");
+      tstcheck(strcmp(valtostring(lbl,lbl_buf),"01234567") == 0, "buf: %.8s",lbl_buf);
     }
 
     tstcase("Compare") {

@@ -117,32 +117,38 @@ static const val_t    valnil = {VAL_NIL};
 #define VAL_LABEL_0        ((uint64_t)0xFFF9000000000000)
 #define valislabelnull(x)  (val(x) == VAL_LABEL_NULL)
 
-
-
   //             1         2         3     3   4         5         6
   //   0         0         0         0     67  0         0         0
   //  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
   // Note that character `\0` is mapped to 63
 
+  //             1         2         3     3   4         5         6
+  //   0         0         0         0     6   0         0         0
+  //  ".0123456789_abcdefghijklmnopqrstuvwxyz[]";
+
 static inline val_t vallabel(char *lbl_str) {
   val_t lbl_val = {VAL_LABEL_NULL};
-  uint64_t lbl = ((uint64_t)0xFFFFFFFFFFFFFFFF); // All '\0'
-  char c;
-  if (lbl_str != NULL) {
-    int shift = 0;
-    for (int i = 0; i < 8 && ((c = *lbl_str) != '\0'); i++, lbl_str++) {
-
-      if ('0' <= c && c <= '9') c = (c & 0x0F);
-      else if ('A' <= c && c <= 'Z') c = (c & 0x1F) - 1 + 10;
-      else if ('a' <= c && c <= 'z') c = (c & 0x1F) - 1 + 37;
-      else if ('_' == c) c = 36;
-      else break; // Invalid characters signal the end of the label
-
-      lbl &= ~(0x3F << shift); // clear the space
-      lbl |=     (c << shift);
+  uint64_t lbl = 0;
+  static const uint8_t ascii_to_lbl[128] = {
+    0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
+    0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
+    0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
+    0x3F, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+    0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x3F, 0x3F, 0x3F, 0x3F, 0x24,
+    0x3F, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33,
+    0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F
+  };
+  uint64_t c = 0;
+  int shift = 0;
+  if (lbl_str != NULL && *lbl_str) {
+    for (int i = 0; i < 8 && c != 0x3F; i++) {
+      c = ascii_to_lbl[*lbl_str++ & 0x7F];
+      lbl |= (c << shift);
       shift += 6;
     }
   }
+  lbl |= ((uint64_t)0x3F << shift);
   lbl_val.v = VAL_LABEL_0 | (lbl & VAL_PAYLOAD_MASK);
   return lbl_val;
 }
@@ -151,22 +157,14 @@ static inline char *val_label_to_str(val_t v, char *lbl_str) {
   uint64_t lbl;
   int c;
   char *lbl_start = lbl_str;
-
-  lbl = v.v & VAL_PAYLOAD_MASK;
+  static char *lbl_to_ascii = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+  lbl = (v.v & VAL_PAYLOAD_MASK) | (uint64_t)0x003F000000000000 ;
   
-  for (int i = 0; i<8 ; i++, lbl_str++) {
-    c = lbl & 0x3F;
-
-    if (c == 63) break; // '\0'
-    else if (c <  10) c += '0';
-    else if (c <  36) c += 'A' - 10;
-    else if (c <  37) c = '_';
-    else c += 'a' - 37;
-
-    *lbl_str = c;
-
+  while ((c = lbl & 0x3F) != 63) {
+    *lbl_str++ = lbl_to_ascii[c];
     lbl >>= 6;
   }
+
   *lbl_str = '\0';
   return lbl_start;
 }
