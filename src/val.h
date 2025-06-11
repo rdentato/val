@@ -122,11 +122,7 @@ static const val_t    valnil = {VAL_NIL};
   //  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
   // Note that character `\0` is mapped to 63
 
-  //             1         2         3     3   4         5         6
-  //   0         0         0         0     6   0         0         0
-  //  ".0123456789_abcdefghijklmnopqrstuvwxyz[]";
-
-static inline val_t vallabel(char *lbl_str) {
+static inline val_t vallabel(char * restrict lbl_str) {
   val_t lbl_val = {VAL_LABEL_NULL};
   uint64_t lbl = 0;
   static const uint8_t ascii_to_lbl[128] = {
@@ -140,30 +136,48 @@ static inline val_t vallabel(char *lbl_str) {
     0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F
   };
   uint64_t c = 0;
-  int shift = 0;
-  if (lbl_str != NULL && *lbl_str) {
-    for (int i = 0; i < 8 && c != 0x3F; i++) {
-      c = ascii_to_lbl[*lbl_str++ & 0x7F];
-      lbl |= (c << shift);
-      shift += 6;
-    }
+
+  if (lbl_str == NULL || *lbl_str == '\0') {
+    lbl_val.v = VAL_LABEL_0 | (uint64_t)0x3F;
+    return lbl_val;
   }
+
+  int shift = 0;
+                   c = ascii_to_lbl[*lbl_str++ & 0x7F];  lbl |= (c << shift);  shift =  6;
+  if (c != 0x3F) { c = ascii_to_lbl[*lbl_str++ & 0x7F];  lbl |= (c << shift);  shift = 12;
+  if (c != 0x3F) { c = ascii_to_lbl[*lbl_str++ & 0x7F];  lbl |= (c << shift);  shift = 18;
+  if (c != 0x3F) { c = ascii_to_lbl[*lbl_str++ & 0x7F];  lbl |= (c << shift);  shift = 24;
+  if (c != 0x3F) { c = ascii_to_lbl[*lbl_str++ & 0x7F];  lbl |= (c << shift);  shift = 30;
+  if (c != 0x3F) { c = ascii_to_lbl[*lbl_str++ & 0x7F];  lbl |= (c << shift);  shift = 36;
+  if (c != 0x3F) { c = ascii_to_lbl[*lbl_str++ & 0x7F];  lbl |= (c << shift);  shift = 42;
+  if (c != 0x3F) { c = ascii_to_lbl[*lbl_str   & 0x7F];  lbl |= (c << shift);  shift = 48;
+  }}}}}}} // UNROLLED LOOP
+
+
   lbl |= ((uint64_t)0x3F << shift);
   lbl_val.v = VAL_LABEL_0 | (lbl & VAL_PAYLOAD_MASK);
   return lbl_val;
 }
 
-static inline char *val_label_to_str(val_t v, char *lbl_str) {
+static inline char *val_label_to_str(val_t v, char * restrict lbl_str) {
   uint64_t lbl;
   int c;
   char *lbl_start = lbl_str;
-  static char *lbl_to_ascii = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+                            //           1         2         3     3   4         5         6
+                            // 0         0         0         0     67  0         0         0
+  static const char *lbl_to_ascii = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+  
   lbl = (v.v & VAL_PAYLOAD_MASK) | (uint64_t)0x003F000000000000 ;
   
-  while ((c = lbl & 0x3F) != 63) {
-    *lbl_str++ = lbl_to_ascii[c];
-    lbl >>= 6;
-  }
+  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+  }}}}}}}} // UNROLLED LOOP
 
   *lbl_str = '\0';
   return lbl_start;
@@ -171,7 +185,7 @@ static inline char *val_label_to_str(val_t v, char *lbl_str) {
 
 #define valislabel(...)  val_islabel(val(val_0(__VA_ARGS__)), val_1(__VA_ARGS__,NULL))
 
-int val_islabel(val_t v, char *s) {
+int val_islabel(val_t v, char * s) {
   
   if (!((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)) return 0;
 
