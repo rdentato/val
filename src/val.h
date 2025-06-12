@@ -160,7 +160,8 @@ static inline val_t vallabel(char * restrict lbl_str) {
   return lbl_val;
 }
 
-typedef struct { char str[16]; } valstr_t;
+#define VAL_STR_MAX_LEN 32
+typedef struct { char str[VAL_STR_MAX_LEN]; } valstr_t;
 
 #define vallabeltostr(v) val_label_to_str(val(v))
 static inline valstr_t val_label_to_str(val_t v) {
@@ -169,26 +170,23 @@ static inline valstr_t val_label_to_str(val_t v) {
   int c;
   char *lbl_str = lbl_str_s.str;
 
-  *lbl_str = '\0';
-  if (!((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)) return lbl_str_s;
-
-
-                            //           1         2         3     3   4         5         6
-                            // 0         0         0         0     67  0         0         0
-  static const char *lbl_to_ascii = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
-  
-  lbl = (v.v & VAL_PAYLOAD_MASK) | (uint64_t)0x003F000000000000 ;
-  
-  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
-  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
-  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
-  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
-  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
-  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
-  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
-  if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
-  }}}}}}}} // UNROLLED LOOP
-
+  if (((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)) {
+                              //           1         2         3     3   4         5         6
+                              // 0         0         0         0     67  0         0         0
+    static const char *lbl_to_ascii = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+    
+    lbl = (v.v & VAL_PAYLOAD_MASK) | (uint64_t)0x003F000000000000 ;
+    
+    if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+    if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+    if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+    if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+    if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+    if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+    if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+    if ((c = lbl_to_ascii[lbl & 0x3F])) { *lbl_str++ = c;  lbl >>= 6;
+    }}}}}}}} // UNROLLED LOOP
+  }
   *lbl_str = '\0';
   return lbl_str_s;
 }
@@ -358,8 +356,9 @@ static inline  _Bool val_tobool(val_t v)  {
 static inline int val_isconst(val_t x) { return ((val(x).v & VAL_CONST_MASK) == VAL_CONST_0);}
 
 #define valislabel(...)  val_islabel(val(val_0(__VA_ARGS__)), val_1(__VA_ARGS__,NULL))
+#define val_is_label(v) ((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)
 static inline int val_islabel(val_t v, char * s) {
-  if (!((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)) return 0;
+  if (!val_is_label(v)) return 0;
   if (s != NULL)  return (vallabel(s).v == v.v);
   return 1;
 }
@@ -441,7 +440,7 @@ static inline char *val_get_charptr(val_t v, valstr_t *str) {
     char **v_ptr = valtoptr(v);
     ret = v_ptr ? *v_ptr : NULL;
   }
-  else if (valislabel(v)) {
+  else if (val_is_label(v)) {
     *str = val_label_to_str(v);
     ret = str->str;
   }
@@ -512,11 +511,35 @@ static inline uint32_t val_hash(val_t v) {
   return hash;
 }
 
+#define valtostr(...) val_tostr(val(val_0(__VA_ARGS__)),val_1(__VA_ARGS__,NULL))
+static inline valstr_t val_tostr(val_t v, char *fmt) {
+  valstr_t ret;
+
+  if (fmt && (*fmt == '\0'))
+         sprintf(ret.str,"%016" PRIX64, v.v);
+  else if (val_is_label(v)) 
+         ret = val_label_to_str(v);
+  else if (valisconst(v))
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%" PRIX64 ">", valtoint(v));
+  else if (val_is_any_ptr(v))
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%p", valtoptr(v));
+  else if (valisbool(v))
+         strcpy(ret.str,(v.v & 1)? "true" : "false");
+  else if (valisnil(v))
+         strcpy(ret.str,"nil");
+  else if (valisint(v))
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%" PRId64, valtoint(v));
+  else if (valisdouble(v)) 
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%f" , valtodouble(v));
+  else sprintf(ret.str,"%016" PRIX64, v.v);
+
+  return ret;
+}
+
+
 // This is needed to avoid warnings about unused static variables.
 static inline uint64_t val_usestatic()
 {
   return (valnil.v | valtrue.v | valfalse.v | valnullptr.v | (uintptr_t)val_emptystr);
 }
-
-
 #endif

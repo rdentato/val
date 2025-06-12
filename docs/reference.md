@@ -26,7 +26,7 @@
     - [`uint64_t valtounsignedint(val_t v)`](#uint64_t-valtounsignedintval_t-v)
     - [`_Bool valtobool(val_t v)`](#_bool-valtoboolval_t-v)
     - [`void *valtoptr(val_t v)`](#void-valtoptrval_t-v)
-    - [`valstr_t vallabeltostr(val_t v)`](#valstr_t-vallabeltostrval_t-v)
+    - [`valstr_t valtostr(val_t v [,char *fmt])`](#valstr_t-valtostrval_t-v-char-fmt)
   - [Pointer Operations](#pointer-operations)
     - [`uint64_t valptrtype(val_t v)`](#uint64_t-valptrtypeval_t-v)
     - [`val_t valtagptr(val_t p, int tag)`, `int valtagptr(val_t v)`](#val_t-valtagptrval_t-p-int-tag-int-valtagptrval_t-v)
@@ -244,39 +244,58 @@ if (ptr != NULL) {
 }
 ```
 
-### `valstr_t vallabeltostr(val_t v)`
-**Usage**: Returns an object containint a pointer to a string version of the label `v`.
+### `valstr_t valtostr(val_t v [,char *fmt])`
+**Usage**: Returns an object containing a pointer to a string version of the value `v`.
 
-If `v` is not a label the string will be empty.
+This is an easy way to get the `val_t` values in string form.
+
+By default, each type has a predifined formatter:
+
+| type     | formatter |
+|----------|-----------|
+| double   | %f        |
+| integer  | % PRId64  |
+| pointers | %p        |
+| boolean  | N/A       |
+| label    | N/A       |
+| nil      | N/A       |
+
+You can specify a custom formatter but you need to be sure you don't exceed 30 characters.
+
 To access the pointer from the object you can use the `.str` field.
 
 ```c
   val_t lbl = vallabel("start");
 
   // You can store the string:
-  valstr_t lbl_str = vallabeltostr(lbl);
+  valstr_t lbl_str = valtostr(lbl);
   printf("%s\n", lbl_str.str); 
 
   // or just use it on the fly:
-  printf("%s\n",vallabeltostr(lbl).str);
+  printf("%s\n",valtostr(lbl).str);
 
-  val_t num = val(123);
-  printf("%s\n",vallabeltostr(num).str);  // Will print ""
+  // WIll print "7"
+  val_t n = val(7);
+  printf("%s\n", valtostr(n).str);
+
+// WIll print "007"
+  val_t n = val(7);
+  printf("%s\n", valtostr(n."%03d").str);
+
 ```
 
 *WARNING*: You can not just save the pointer to the `.str` field:
 ```c
   val_t lbl = vallabel("start");
-  char *s = vallabeltostr(lbl).str; // INVALID the pointer will be dangling after this line. 
+  char *s = valtostr(lbl).str; // INVALID the s pointer will be dangling after this line. 
 ```
 If you need to store the pointer to the string to be used at a later time, you need to keep the result of `vallabeltostr()` in scope.
 
 ```c
   val_t    lbl = vallabel("start");
-  valstr_t lbl_str = vallabeltostr(lbl);
+  valstr_t lbl_str = valtostr(lbl);
   char *s = lbl_str.str; // The pointer will be valid as long as lbl_str is alive
 ```
-
 
 ## Pointer Operations
 

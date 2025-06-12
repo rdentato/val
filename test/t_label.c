@@ -14,10 +14,10 @@ tstsuite("Val Library labels") {
 
     tstcase("Create a label") {
       lbl = vallabel("Hello");
-      lbl_str = vallabeltostr(lbl);
+      lbl_str = valtostr(lbl);
 
       tstnote("Hello: %016" PRIX64 "  \"%s\"", lbl.v, lbl_str.str);
-      tstnote("Hello: %016" PRIX64 "  \"%s\"", lbl.v, vallabeltostr(lbl).str);
+      tstnote("Hello: %016" PRIX64 "  \"%s\"", lbl.v, valtostr(lbl).str);
 
       tstcheck(strcmp(lbl_str.str,"Hello") == 0);
     }
@@ -25,25 +25,25 @@ tstsuite("Val Library labels") {
     tstcase("Wrong chars") {
       lbl = vallabel("A!B");
       
-      tstcheck(strcmp( (lbl_str = vallabeltostr(lbl)).str,"A") == 0, "buf: %.8s",lbl_str.str);
+      tstcheck(strcmp( (lbl_str = valtostr(lbl)).str,"A") == 0, "buf: %.8s",lbl_str.str);
 
       lbl = vallabel("A:B");
-      lbl_str = vallabeltostr(lbl);
+      lbl_str = valtostr(lbl);
       tstcheck(strcmp(lbl_str.str,"A") == 0, "buf: %.8s",lbl_str.str);
 
       lbl = vallabel("!AB");
-      lbl_str = vallabeltostr(lbl);
+      lbl_str = valtostr(lbl);
       tstcheck(strcmp(lbl_str.str,"") == 0, "buf: %.8s",lbl_str.str);
     }
 
     tstcase("Wrong length") {
-      lbl_str = vallabeltostr(vallabel(""));
+      lbl_str = valtostr(vallabel(""));
       tstcheck(strcmp(lbl_str.str,"") == 0, "buf: %.8s",lbl_str.str);
 
-      lbl_str = vallabeltostr(vallabel("01234567"));
+      lbl_str = valtostr(vallabel("01234567"));
       tstcheck(strcmp(lbl_str.str,"01234567") == 0, "buf: %.8s",lbl_str.str);
 
-      lbl_str = vallabeltostr(vallabel("012345678"));
+      lbl_str = valtostr(vallabel("012345678"));
       tstcheck(strcmp(lbl_str.str,"01234567") == 0, "buf: %.8s",lbl_str.str);
     }
 
