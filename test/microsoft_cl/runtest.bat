@@ -40,16 +40,24 @@ for %%E in (t_*.exe) do (
 echo END %DATE% %TIME% >> test.log
 
 rem Step 3: Count PASS/FAIL
+
+
+setlocal
+
 echo Checking results
-set /a PASS_COUNT=0
-set /a FAIL_COUNT=0
 
-for /f "delims=" %%L in (test.log) do (
-    :: echo %%L
-    echo "%%L" | findstr /c:" PASS|" >nul && set /a PASS_COUNT+=1
-    echo "%%L" | findstr /c:" FAIL|" >nul && set /a FAIL_COUNT+=1
-)
+rem — Count PASS lines (find is lighter than findstr here)
+for /f "tokens=2 delims=:" %%A in ('
+    find /c " PASS|" test.log
+') do set PASS_COUNT=%%A
 
-echo TOTAL: %FAIL_COUNT% FAIL : %PASS_COUNT% PASS >> test.log
+rem — Count FAIL lines
+for /f "tokens=2 delims=:" %%A in ('
+    find /c " FAIL|" test.log
+') do set FAIL_COUNT=%%A
+
+>>test.log echo TOTAL  %FAIL_COUNT% FAIL  :  %PASS_COUNT% PASS
+
+endlocal
 
 echo All programs have run.  Stderr output (if any) is in test.log.
