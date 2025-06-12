@@ -174,28 +174,28 @@ if (valislabel(v,"itm_lost")) {
 if (valisptr(v)) {           // any pointer
     printf("It's a pointer\n");
 }
-if (valisptr(v, VAL_PTR_CHAR)) {  // specific pointer type
+if (valisptr(v, VALPTR_CHAR)) {  // specific pointer type
     printf("It's a char pointer\n");
 }
 ```
 Pointer `type` can be one of the following:
 
-`VAL_PTR_VOID   `
-`VAL_PTR_CHAR   `
-`VAL_PTR_CHARPTR`
-`VAL_PTR_5`
-`VAL_PTR_4`
-`VAL_PTR_3`
-`VAL_PTR_2`
-`VAL_PTR_1`
+ - `VALPTR_VOID   `
+ - `VALPTR_CHAR   `
+ - `VALPTR_CHARPTR`
+ - `VALPTR_5`
+ - `VALPTR_4`
+ - `VALPTR_3`
+ - `VALPTR_2`
+ - `VALPTR_1`
 
 as a shortened form, the following functions are also available:
 
 | short form          | long form                     |
 |---------------------|-------------------------------|
-|`valisvoidptr(x)`    | `valisptr(x,VAL_PTR_VOID)`    |
-|`valischarptr(x)`    | `valisptr(x,VAL_PTR_CHAR)`    |
-|`valischarptrptr(x)` | `valisptr(x,VAL_PTR_CHARPTR)` |
+|`valisvoidptr(x)`    | `valisptr(x,VALPTR_VOID)`    |
+|`valischarptr(x)`    | `valisptr(x,VALPTR_CHAR)`    |
+|`valischarptrptr(x)` | `valisptr(x,VALPTR_CHARPTR)` |
 |`valisnullptr(x)`    | `valtoptr(x) == NULL`       |
 
 **Usage**: Check for specific pointer types.
@@ -284,20 +284,20 @@ If you need to store the pointer to the string to be used at a later time, you n
 **Usage**: Returns the pointer type, or 0 if not a pointer.
 ```c
 uint64_t type = valptrtype(v);
-if (type == VAL_PTR_CHAR) {
+if (type == VALPTR_CHAR) {
     printf("It's a char pointer\n");
 }
 ```
 Pointer `type` will be one of the following:
 
-`VAL_PTR_VOID   `
-`VAL_PTR_CHAR   `
-`VAL_PTR_CHARPTR`
-`VAL_PTR_5`
-`VAL_PTR_4`
-`VAL_PTR_3`
-`VAL_PTR_2`
-`VAL_PTR_1`
+`VALPTR_VOID   `
+`VALPTR_CHAR   `
+`VALPTR_CHARPTR`
+`VALPTR_5`
+`VALPTR_4`
+`VALPTR_3`
+`VALPTR_2`
+`VALPTR_1`
 
 
 ### `val_t valtagptr(val_t p, int tag)`, `int valtagptr(val_t v)`
@@ -314,20 +314,20 @@ tag = valtagptr(tagged);    // Will return 2
 Tags are 3-bits number (values 0-7) requiring a pointer alignment of 8 bytes. The tag 0 is the default one for pointers. Tags can be used to mark a pointer as "visited" or to signal it is not to be disposed yet, etc.
 
 ### Custom pointers
-The pointers `VAL_PTR_1` through `VAL_PTR_5` can be use to add custom pointers to the set of values that can be stored in a `val_t` variable.
+The pointers `VALPTR_1` through `VALPTR_5` can be use to add custom pointers to the set of values that can be stored in a `val_t` variable.
 
 **Usage**: 
 ```c
 // Define custom pointer types before including val.h
 #define valptr_1_t FILE *
-#define PTRTAG_FILE VAL_PTR_1
+#define PTRTAG_FILE VALPTR_1
 
 #include "val.h"
 
 // Or after as long as it is a pointer to a structure (the most common case)
 struct  valptr_2_s { int x; int y; };
 #define point_t valptr_2_t 
-#define PTRTAG_POINT VAL_PTR_2
+#define PTRTAG_POINT VALPTR_2
 ```
 
 ## Comparison and Hashing
