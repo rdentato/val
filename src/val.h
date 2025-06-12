@@ -117,6 +117,7 @@ static const val_t    valnil = {VAL_NIL};
 #define VAL_LABEL_0        ((uint64_t)0xFFF9000000000000)
 #define valislabelnull(x)  (val(x) == VAL_LABEL_NULL)
 
+
   //             1         2         3     3   4         5         6
   //   0         0         0         0     67  0         0         0
   //  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
@@ -159,10 +160,19 @@ static inline val_t vallabel(char * restrict lbl_str) {
   return lbl_val;
 }
 
-static inline char *val_label_to_str(val_t v, char * restrict lbl_str) {
+typedef struct { char str[16]; } valstr_t;
+
+#define vallabeltostr(v) val_label_to_str(val(v))
+static inline valstr_t val_label_to_str(val_t v) {
+  valstr_t lbl_str_s;
   uint64_t lbl;
   int c;
-  char *lbl_start = lbl_str;
+  char *lbl_str = lbl_str_s.str;
+
+  *lbl_str = '\0';
+  if (!((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)) return lbl_str_s;
+
+
                             //           1         2         3     3   4         5         6
                             // 0         0         0         0     67  0         0         0
   static const char *lbl_to_ascii = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
@@ -180,20 +190,7 @@ static inline char *val_label_to_str(val_t v, char * restrict lbl_str) {
   }}}}}}}} // UNROLLED LOOP
 
   *lbl_str = '\0';
-  return lbl_start;
-}
-
-#define valislabel(...)  val_islabel(val(val_0(__VA_ARGS__)), val_1(__VA_ARGS__,NULL))
-
-int val_islabel(val_t v, char * s) {
-  
-  if (!((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)) return 0;
-
-  if (s != NULL) {
-    char lbl_str[10];
-    return (strcmp(s,val_label_to_str(v,lbl_str)) == 0);
-  }
-  return 1;
+  return lbl_str_s;
 }
 
 
@@ -337,7 +334,6 @@ static inline  _Bool val_tobool(val_t v)  {
   else return ((v.v & VAL_32BIT_MASK) != 0);
 }
 
-
 // User defined constants
 #define valconst(x)   ((val_t){ VAL_CONST_0 | ((x) & VAL_32BIT_MASK)})
 
@@ -360,6 +356,13 @@ static inline  _Bool val_tobool(val_t v)  {
                           )
 
 static inline int val_isconst(val_t x) { return ((val(x).v & VAL_CONST_MASK) == VAL_CONST_0);}
+
+#define valislabel(...)  val_islabel(val(val_0(__VA_ARGS__)), val_1(__VA_ARGS__,NULL))
+static inline int val_islabel(val_t v, char * s) {
+  if (!((v.v & VAL_TYPE_MASK) == VAL_LABEL_0)) return 0;
+  if (s != NULL)  return (vallabel(s).v == v.v);
+  return 1;
+}
 
 // ==== Pointer tagging
 // Except for `void *` and `char *`, any pointer can be *tagged* with 
@@ -431,40 +434,39 @@ static inline int val_tagptr_get(val_t v) {
 // This checks for val_t values IDENTITY
 #define valeq(x,y) (val(x).v == val(y).v)
 
+static inline char *val_get_charptr(val_t v, valstr_t *str) {
+  char *ret = val_emptystr;
+  if (valischarptr(v)) ret = valtoptr(v);
+  else if (valisbufptr(v)) {
+    char **v_ptr = valtoptr(v);
+    ret = v_ptr ? *v_ptr : NULL;
+  }
+  else if (valislabel(v)) {
+    *str = val_label_to_str(v);
+    ret = str->str;
+  }
+  return ret;
+}
+
 // This compares two val_t values. Like the hash function below, it is provide just for convenience 
 // since your criteria for comparison and hashing might be different.
 #define valcmp(a,b) val_cmp(val(a),val(b))
 static inline int val_cmp(val_t a, val_t b) {
   char *sa = val_emptystr;
   char *sb = val_emptystr;
-  char lbl_str_a[10];
-  char lbl_str_b[10];
+  valstr_t lbl_str_a;
+  valstr_t lbl_str_b;
 
-  if (valischarptr(a)) sa = valtoptr(a);
-  else if (valisbufptr(a)) {
-    char **sa_ptr = valtoptr(a);
-    sa = sa_ptr ? *sa_ptr : NULL;
-  }
-  else if (valislabel(a)) {
-    sa = val_label_to_str(a,lbl_str_a);
-  }
+  sa = val_get_charptr(a,&lbl_str_a);
   
   if (sa != val_emptystr) {
-    if (valischarptr(b)) sb = valtoptr(b);
-    else if (valisbufptr(b)) {
-      char **sb_ptr = valtoptr(b);
-      sb = sb_ptr ? *sb_ptr : NULL;
-    }
-    else if (valislabel(b)) {
-      sb = val_label_to_str(b,lbl_str_b);
-    }
+    sb = val_get_charptr(b,&lbl_str_b);
 
     if (sb != val_emptystr) {
       if (sa == NULL) sa = val_emptystr; // / To avoid calling strcmp
       if (sb == NULL) sb = val_emptystr; // \ with NULL arguments
-      /// fprintf(stderr,"a: %016" PRIX64 " b: %016" PRIX64 "\n",a.v,b.v);
-      int ret = strcmp(sa,sb);
-      return ret;
+
+      return strcmp(sa,sb);
     }
   }
 
@@ -485,24 +487,15 @@ static inline uint32_t val_hash(val_t v) {
   uint32_t hash = (uint32_t)0x811c9dc5; // FNV1a INIT
 
   char *s = val_emptystr;
-  char lbl_str[10];
+  valstr_t lbl_str;
 
-  if (valischarptr(v)) s = valtoptr(v);
-  else if (valisbufptr(v)) {
-    char **s_ptr = valtoptr(v);
-    s = s_ptr ? *s_ptr : NULL;
-  }
-  else if (valislabel(v)) {
-    s = val_label_to_str(v,lbl_str);
-  }
+  s = val_get_charptr(v,&lbl_str);
 
-  if (s != val_emptystr) {
-    if (s != NULL) {
-      // FNV1a abridged from http://www.isthe.com/chongo/tech/comp/fnv/index.html
-      while (*s) {
-        hash ^= (uint32_t)(*s++);
-        hash *= (uint32_t)0x01000193; // FNV1a PRIME
-      }
+  if (s != val_emptystr && s != NULL) {
+    // FNV1a abridged from http://www.isthe.com/chongo/tech/comp/fnv/index.html
+    while (*s) {
+      hash ^= (uint32_t)(*s++);
+      hash *= (uint32_t)0x01000193; // FNV1a PRIME
     }
   }
   else {
@@ -517,48 +510,6 @@ static inline uint32_t val_hash(val_t v) {
     hash = (uint32_t)(h >> 32);
   }
   return hash;
-}
-
-// WARNING: Using valtostring without providing a buffer makes it not thread safe!!!
-#define valtostring(...) val_tostring(val(val_0(__VA_ARGS__)), val_1(__VA_ARGS__,NULL), val_2(__VA_ARGS__ ,NULL, NULL))
-static inline const char *val_tostring(val_t v, char *str, char *fmt)
-{
-  static char str_buf[32];
-  str_buf[0] = '\0';
-
-  // Check if there are only two paramenters and the second one is a format specifier
-  if (fmt == NULL) { 
-    if (str != NULL) {
-      // Check if the string is a printf specifier for doubles
-      if (*str == '%') {
-        char *s = str+1;
-        while (*s && ((s-str) < 15) ) s++;
-        if (*s == '\0') switch (s[-1]) {
-          case 'e': case 'E': case 'f': case 'F':
-          case 'g': case 'G': case 'a': case 'A': 
-            fmt = str; str = NULL;
-        }
-      }
-    }
-    else fmt = "%f";
-  }
-
-  if (str == NULL) str = str_buf; 
-
-  *str = '\0';
-
-       if (valislabel(v))   val_label_to_str(v,str);
-  else if (valisdouble(v))  (str == str_buf)? snprintf(str, 32, fmt, valtodouble(v)) : sprintf(str, fmt, valtodouble(v));
-  else if (valisconst(v))   sprintf(str, "%08" PRIX32 , (uint32_t)(v.v & VAL_32BIT_MASK));
-  else if (valischarptr(v)) { char *p = valtoptr(v); return (p? p : val_emptystr); }
-  else if (valisbufptr(v))  { void *p = valtoptr(v); if (p != NULL) p = *(char **)p; return (p? p : val_emptystr); }
-  else if (valisptr(v))     sprintf(str,"%p",valtoptr(v));
-  else if (valisnil(v))     return "nil";
-  else if (valisbool(v))    return ((v.v & 1) ? "true" : "false");
-  else sprintf(str,"%016" PRIX64, v.v);
-
-  str_buf[30] = '\0';
-  return str;
 }
 
 // This is needed to avoid warnings about unused static variables.

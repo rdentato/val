@@ -26,7 +26,7 @@
     - [`uint64_t valtounsignedint(val_t v)`](#uint64_t-valtounsignedintval_t-v)
     - [`_Bool valtobool(val_t v)`](#_bool-valtoboolval_t-v)
     - [`void *valtoptr(val_t v)`](#void-valtoptrval_t-v)
-    - [`const char *valtostring(val_t v [, char *buffer] [,char *format])`](#const-char-valtostringval_t-v--char-buffer-char-format)
+    - [`valstr_t vallabeltostr(val_t v)`](#valstr_t-vallabeltostrval_t-v)
   - [Pointer Operations](#pointer-operations)
     - [`uint64_t valptrtype(val_t v)`](#uint64_t-valptrtypeval_t-v)
     - [`val_t valtagptr(val_t p, int tag)`, `int valtagptr(val_t v)`](#val_t-valtagptrval_t-p-int-tag-int-valtagptrval_t-v)
@@ -244,40 +244,39 @@ if (ptr != NULL) {
 }
 ```
 
-### `const char *valtostring(val_t v [, char *buffer] [,char *format])`
-**Usage**: Returns a pointer to a string version of the value `v`.
+### `valstr_t vallabeltostr(val_t v)`
+**Usage**: Returns an object containint a pointer to a string version of the label `v`.
 
-If a `buffer` (which must be large enough to accomodate the result) is provided it should be initialized to `""` (i.e. `buffer[0] = '\0'`).
-The `format` parameters is for printing numbers and can be any double format specifier for `printf()`. Defaults to `"%f"`.
-
-*WARNING*: Not providing the buffer makes the function non thread-safe.
-
-*WARNING*: Not providing the buffer limits the output to be max 30 characters long.
-
-*WARNING*: Only the return value must be used, the content of the provided buffer after the call is undefined.
+If `v` is not a label the string will be empty.
+To access the pointer from the object you can use the `.str` field.
 
 ```c
+  val_t lbl = vallabel("start");
 
-if (valisbool(v)) {
-  printf("%s\n",valtostr(v));   // NOT THREAD SAFE
+  // You can store the string:
+  valstr_t lbl_str = vallabeltostr(lbl);
+  printf("%s\n", lbl_str.str); 
 
-  char str_buf[10];
-  printf("%s\n",valtostr(v,str_buf)); // THREAD SAFE
-}
+  // or just use it on the fly:
+  printf("%s\n",vallabeltostr(lbl).str);
 
-if (valisdouble(v)) {
-  printf("%s\n",valtostr(v));               // NOT THREAD SAFE
-
-  printf("%s\n",valtostr(v,"%.2f"));        // NOT THREAD SAFE
-
-  printf("%s\n",valtostr(v,NULL, "%.2f"));  // NOT THREAD SAFE
-
-  char str_buf[10];
-  str_buf[0] = '\0';
-  printf("%s\n",valtostr(v,str_buf,"%.2f"));// THREAD SAFE
-}
-
+  val_t num = val(123);
+  printf("%s\n",vallabeltostr(num).str);  // Will print ""
 ```
+
+*WARNING*: You can not just save the pointer to the `.str` field:
+```c
+  val_t lbl = vallabel("start");
+  char *s = vallabeltostr(lbl).str; // INVALID the pointer will be dangling after this line. 
+```
+If you need to store the pointer to the string to be used at a later time, you need to keep the result of `vallabeltostr()` in scope.
+
+```c
+  val_t    lbl = vallabel("start");
+  valstr_t lbl_str = vallabeltostr(lbl);
+  char *s = lbl_str.str; // The pointer will be valid as long as lbl_str is alive
+```
+
 
 ## Pointer Operations
 
