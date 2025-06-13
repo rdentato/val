@@ -44,14 +44,14 @@
 //          7FF8
 //
 //  The value "Quiet NaN Indefinite" `nan`, which is the value returend by invalid operations like
-//  0.0/0.0, is usually 0x7FF8000000000000 (and 0x7FF8000000000000 for `-nan`).
+//  0.0/0.0, is usually 0x7FF8000000000000 (and 0xFFF8000000000000 for `-nan`).
 //  This library never uses or generates these value to avoid conflicts. This is not a guarantee as
 //  the IEEE standard only requires that a NaN is produced, without specifying which one.
 //  However, the assumption should work reasonably well for most modern computers.
 
 #define VAL_NAN_MASK     ((uint64_t)0x7FF8000000000000)
 
-#define VAL_DBLNAN_MASK  ((uint64_t)0x7FFFFFFFFFFFFFFF)
+#define VAL_DBLNAN_MASK  ((uint64_t)0x0007000000000000)
 #define VAL_DBLNAN_NEG   ((uint64_t)0xFFF8000000000000)
 #define VAL_DBLNAN_POS   ((uint64_t)0x7FF8000000000000)
 
@@ -60,26 +60,20 @@ typedef struct {uint64_t v;} val_t;
 static_assert(sizeof(val_t) == sizeof(uint64_t), "Wrong size for val_t");
 static_assert(sizeof(val_t) == 8, "Wrong size for uint64_t");
 
-typedef struct {int32_t v;} val_dummy_t;
-
-static_assert(sizeof(val_dummy_t) == sizeof(int32_t), "Wrong size for val_dummy_t");
-static_assert(sizeof(val_dummy_t) == 4, "Wrong size for int32_t");
-
 // Some auxiliary macros for optional parameters
-#define val_x(...)     __VA_ARGS__
+#define val_x(...)    __VA_ARGS__
 #define val_0(x,...)      x
-#define val_1(y,x,...)    x
-#define val_2(z,y,x,...)  x
+#define val_1(_,x,...)    x
 
 // ==== Numbers
 // All numbers are stored as a double floating point.
-// A value v is NaN-boxed if  (v & VAL_NAN_MASK) == VAL_NAN_MASK
-// Otherwise is a double (i.e. is not a NaN).
 
+// All non-NaN numbers are doubles.
+// Except VAL_DBLNAN_NEG and VAL_DBLNAN_POS
 #define valisdouble(x) val_isdouble(val(x)) 
 static inline int val_isdouble(val_t v) {
   return ((v.v & VAL_NAN_MASK) != VAL_NAN_MASK)
-      || ((v.v & VAL_DBLNAN_MASK) == VAL_DBLNAN_POS);
+      || ((v.v & VAL_DBLNAN_MASK) == 0);
 }
 
 #define VAL_TYPE_MASK     ((uint64_t)0xFFFF000000000000)
