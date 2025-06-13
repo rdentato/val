@@ -60,4 +60,4 @@ for /f "tokens=2 delims=:" %%A in ('
 
 endlocal
 
-echo All programs have run.  Stderr output (if any) is in test.log.
+echo All programs have run. Output is in test.log.
