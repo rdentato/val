@@ -16,15 +16,14 @@
 // It's just better than nothing.
 // This is critical, if the test fail the val library is unusable
 
-   int a00;
-
-
-    int fits48(void *p) { return ((uintptr_t)p >> 48) == 0; }
+int a00;
+int fits48(void *p) { return ((uint64_t)((uintptr_t)p) >> 48) == 0; }
 
 tstsuite("Val Library ptr check", core) {
   tstcase("Check static objects") {
     int ptr_exceed_48 = 0;
     ptr_exceed_48 |= !fits48(&a00);    // a global variavle
+    ptr_exceed_48 |= !fits48((void*)(&valnil));    // a global variavle
     ptr_exceed_48 |= !fits48(&ptr_exceed_48);    // a local variavle
     ptr_exceed_48 |= !fits48(fits48);  // a user function
     ptr_exceed_48 |= !fits48(fprintf); // a library function
