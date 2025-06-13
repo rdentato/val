@@ -1,0 +1,11 @@
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+DocumentName: val
+DocumentNamespace: https://gh.dentato.com/val
+Creator: Person: Remo Dentato (rdentato@gmail.com)
+Created: 2025-06-14T12:00:00Z
+
+PackageName: val
+PackageVersion: 0.3.8
+PackageHomePage: https://gh.dentato.com/val
+PackageLicenseDeclared: MIT

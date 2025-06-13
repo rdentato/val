@@ -1,6 +1,6 @@
-//  SPDX-FileCopyrightText: © 2025 Remo Dentato <rdentato@gmail.com>
+//  SPDX-FileCopyrightText: © 2025 Remo Dentato (rdentato@gmail.com)
 //  SPDX-License-Identifier: MIT
-//  PackageVersion: 0.3.8 Beta
+
 
 #ifndef VAL_VERSION
 #define VAL_VERSION 0x0003008B
@@ -43,11 +43,17 @@
 //    12 bits set to 1   Payload (48 bits)
 //          7FF8
 //
-//  The value "Quiet NaN Indefinite" which is the value returend by invalid operations like
-//  0/0, is usually 0xFFF8000000000000 (that's the case both for Intel and ARM 64 bits processors).
-//  This library never uses or generates this value to avoid conflicts. This is not a guarantee as
+//  The value "Quiet NaN Indefinite" `nan`, which is the value returend by invalid operations like
+//  0.0/0.0, is usually 0x7FF8000000000000 (and 0x7FF8000000000000 for `-nan`).
+//  This library never uses or generates these value to avoid conflicts. This is not a guarantee as
 //  the IEEE standard only requires that a NaN is produced, without specifying which one.
 //  However, the assumption should work reasonably well for most modern computers.
+
+#define VAL_NAN_MASK     ((uint64_t)0x7FF8000000000000)
+
+#define VAL_DBLNAN_MASK  ((uint64_t)0x7FFFFFFFFFFFFFFF)
+#define VAL_DBLNAN_NEG   ((uint64_t)0xFFF8000000000000)
+#define VAL_DBLNAN_POS   ((uint64_t)0x7FF8000000000000)
 
 typedef struct {uint64_t v;} val_t;
 
@@ -69,9 +75,13 @@ static_assert(sizeof(val_dummy_t) == 4, "Wrong size for int32_t");
 // All numbers are stored as a double floating point.
 // A value v is NaN-boxed if  (v & VAL_NAN_MASK) == VAL_NAN_MASK
 // Otherwise is a double (i.e. is not a NaN).
-#define valisdouble(x)  ((val(x).v & VAL_NAN_MASK) != VAL_NAN_MASK)
 
-#define VAL_NAN_MASK      ((uint64_t)0x7FF8000000000000)
+#define valisdouble(x) val_isdouble(val(x)) 
+static inline int val_isdouble(val_t v) {
+  return ((v.v & VAL_NAN_MASK) != VAL_NAN_MASK)
+      || ((v.v & VAL_DBLNAN_MASK) == VAL_DBLNAN_POS);
+}
+
 #define VAL_TYPE_MASK     ((uint64_t)0xFFFF000000000000)
 #define VAL_PAYLOAD_MASK  ((uint64_t)0x0000FFFFFFFFFFFF)
 
@@ -96,8 +106,8 @@ static inline int val_isint(val_t v) {
 
 // ==== CONSTANTS
 #define VAL_CONST_MASK    ((uint64_t)0xFFFFFFFF00000000)
-#define VAL_CONST_0       ((uint64_t)0xFFF81AA100000000)
-#define VAL_FALSE         ((uint64_t)0xFFF8FFFF00000000)
+#define VAL_CONST_0       ((uint64_t)0x7FF91AA100000000)
+#define VAL_FALSE         ((uint64_t)0x7FF9FFFF00000000)
 #define VAL_32BIT_MASK    ((uint64_t)0x00000000FFFFFFFF)
 
 // Booleans
@@ -107,16 +117,17 @@ static const val_t valtrue  = {VAL_FALSE | 1};
 #define valisbool(x) ((val(x).v & VAL_CONST_MASK) == VAL_FALSE)
 
 // A nil value to signal a void value
-#define VAL_NIL       ((uint64_t)0xFFF800FF00000000)
+#define VAL_NIL       ((uint64_t)0x7FF900FF00000000)
 static const val_t    valnil = {VAL_NIL};
 
 #define valisnil(x)   ((val(x).v == VAL_NIL))
 
 // Labels (8 chars strings of upper/lower case, digits and '_')
-#define VAL_LABEL_NULL     ((uint64_t)0xFFF9FFFFFFFFFFFF)
-#define VAL_LABEL_0        ((uint64_t)0xFFF9000000000000)
-#define valislabelnull(x)  (val(x) == VAL_LABEL_NULL)
+#define VAL_LABEL_NULL     ((uint64_t)0x7FFAFFFFFFFFFFFF)
+#define VAL_LABEL_0        ((uint64_t)0x7FFA000000000000)
+#define valislabelnull(x)  (val(x) == vallabelnull)
 
+static const val_t vallabelnull = {VAL_LABEL_NULL};
 
   //             1         2         3     3   4         5         6
   //   0         0         0         0     67  0         0         0
@@ -193,26 +204,19 @@ static inline valstr_t val_label_to_str(val_t v) {
 
 
 // ==== POINTERS
-#define VAL_PTR_MASK  ((uint64_t)0xFFF8000000000000)
 
-#define VALPTR_VOID   ((uint64_t)0x7FF8000000000000)
-#define VALPTR_CHAR   ((uint64_t)0x7FF9000000000000)
+#define VALPTR_VOID   ((uint64_t)0xFFF9000000000000)
+#define VALPTR_CHAR   ((uint64_t)0xFFFA000000000000)
 
 // Buffers are structures whose first field is a char *
-#define VALPTR_BUF    ((uint64_t)0x7FFA000000000000)
+#define VALPTR_BUF    ((uint64_t)0xFFFB000000000000)
 typedef struct valptr_buf_s *valptr_buf_t; 
 
-// Reserved
-#define VALPTR_5      ((uint64_t)0x7FFB000000000000)
-#ifndef valptr_5_t
-typedef struct valptr_5_s *valptr_5_t; 
-#endif
-
 // These can be user defined.
-#define VALPTR_4      ((uint64_t)0x7FFC000000000000)
-#define VALPTR_3      ((uint64_t)0x7FFD000000000000)
-#define VALPTR_2      ((uint64_t)0x7FFE000000000000)
-#define VALPTR_1      ((uint64_t)0x7FFF000000000000)
+#define VALPTR_4      ((uint64_t)0xFFFC000000000000)
+#define VALPTR_3      ((uint64_t)0xFFFD000000000000)
+#define VALPTR_2      ((uint64_t)0xFFFE000000000000)
+#define VALPTR_1      ((uint64_t)0xFFFF000000000000)
 
 #ifndef valptr_4_t
 typedef struct valptr_4_s *valptr_4_t; 
@@ -227,11 +231,12 @@ typedef struct valptr_2_s *valptr_2_t;
 typedef struct valptr_1_s *valptr_1_t; 
 #endif
 
-#define val_is_any_ptr(v) ((v.v & VAL_PTR_MASK)  == VALPTR_VOID)
+#define val_is_any_ptr(v) (((v).v & VAL_TYPE_MASK) >= VALPTR_VOID)
+
 #define valisptr(p,...) val_isptr(val(p), __VA_ARGS__ +0)
 static inline int val_isptr(val_t v, uint64_t ptr_type)  {
-    if (ptr_type == 0) return val_is_any_ptr(v);
-  else            return ((v.v & VAL_TYPE_MASK)  == ptr_type); 
+    if (!ptr_type) return val_is_any_ptr(v);
+  else             return ((v.v & VAL_TYPE_MASK) == ptr_type); 
 }
 
 #define valisvoidptr(x)     ((val(x).v & VAL_TYPE_MASK) == VALPTR_VOID)
@@ -263,7 +268,6 @@ static inline val_t val_fromuint(uint64_t v)    {return val_fromdouble((double)v
 static inline val_t val_frompvoidtr(void *v)    {val_t ret; ret.v = VALPTR_VOID | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 static inline val_t val_fromcharptr(void *v)    {val_t ret; ret.v = VALPTR_CHAR | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 static inline val_t val_frombufptr(void *v)     {val_t ret; ret.v = VALPTR_BUF  | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
-static inline val_t val_fromptr_5(void *v)      {val_t ret; ret.v = VALPTR_5    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 static inline val_t val_fromptr_4(void *v)      {val_t ret; ret.v = VALPTR_4    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 static inline val_t val_fromptr_3(void *v)      {val_t ret; ret.v = VALPTR_3    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
 static inline val_t val_fromptr_2(void *v)      {val_t ret; ret.v = VALPTR_2    | ((uintptr_t)(v) & VAL_PAYLOAD_MASK); return ret;}
@@ -293,7 +297,6 @@ static inline val_t val_fromval(val_t v)        {return v;}
                          signed char*: val_fromcharptr,    \
                        unsigned char*: val_fromcharptr,    \
                          valptr_buf_t: val_frombufptr,     \
-                           valptr_5_t: val_fromptr_5,      \
                            valptr_4_t: val_fromptr_4,      \
                            valptr_3_t: val_fromptr_3,      \
                            valptr_2_t: val_fromptr_2,      \
@@ -382,7 +385,7 @@ static_assert(alignof(val_align_t) >= VAL_MIN_ALIGN, "Alignment requirements not
 
 static inline int val_check_taggable_ptr(val_t v) {
   // Not a pointer
-  if ((v.v & VAL_PTR_MASK) != VALPTR_VOID) return -1; 
+  if (!val_is_any_ptr(v)) return -1; 
 
   // It's either a char or void pointer can't be tagged
   if ((v.v & VAL_TYPE_MASK) <= VALPTR_CHAR)  return 0;
@@ -402,8 +405,8 @@ static inline   void *val_toptr(val_t v) {
     case -1: return NULL; // Not a pointer
     case  1: mask &= ~VAL_TAG_MASK; // taggable ptr. Need to eliminate the tag!
   }
-
-  return (void *)((uintptr_t)(v.v & mask));
+  void * ret = (void *)((uintptr_t)(v.v & mask));
+  return ret;
 }
 
 #define valptrtype(v) val_ptrtype(val(v))
@@ -516,7 +519,7 @@ static inline valstr_t val_tostr(val_t v, char *fmt) {
   valstr_t ret;
 
   if (fmt && (*fmt == '\0'))
-         sprintf(ret.str,"%016" PRIX64, v.v);
+         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, v.v);
   else if (val_is_label(v)) 
          ret = val_label_to_str(v);
   else if (valisconst(v))
@@ -531,7 +534,8 @@ static inline valstr_t val_tostr(val_t v, char *fmt) {
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%" PRId64, valtoint(v));
   else if (valisdouble(v)) 
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%f" , valtodouble(v));
-  else sprintf(ret.str,"%016" PRIX64, v.v);
+  else
+         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, v.v);
 
   return ret;
 }

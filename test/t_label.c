@@ -1,3 +1,5 @@
+//  SPDX-FileCopyrightText: © 2025 Remo Dentato (rdentato@gmail.com)
+//  SPDX-License-Identifier: MIT
 
 #include "tst.h"
 #include <stdio.h>

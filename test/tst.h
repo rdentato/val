@@ -1,4 +1,4 @@
-//  SPDX-FileCopyrightText: © 2023 Remo Dentato <rdentato@gmail.com>
+//  SPDX-FileCopyrightText: © 2023 Remo Dentato (rdentato@gmail.com)
 //  SPDX-License-Identifier: MIT
 //  SPDX-PackageVersion: 0.7.4-rc
 
