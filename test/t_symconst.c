@@ -17,10 +17,10 @@ tstsuite("Val Library syms") {
     tstcase("Check") {
       char *s;
       s = "87654321";
-      for (int i = 8; i>0; i--) {
+      for (int i = 8; i>=0; i--) {
         sym = valconst(s+i);
         sym_vstr = valtostr(sym);
-        tstnote("%d %8s: %016" PRIX64 "  \"%s\"", valissymconst(sym), s+i, sym.v, sym_vstr.str);
+        tstnote("%d %d %8s: %016" PRIX64 "  \"%s\"", i, valissymconst(sym), s+i, sym.v, sym_vstr.str);
       }
 
     }

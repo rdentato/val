@@ -4,21 +4,45 @@ A comprehensive C library for NaN boxing and pointer tagging that efficiently st
 
 ## Table of Contents
 
-1. [Introduction](#introduction)
-2. [Core Concepts](#core-concepts)
-3. [Data Types](#data-types)
-4. [Boxing Operations](#boxing-operations)
-5. [Numbers](#numbers)
-6. [Pointers](#pointers)
-7. [Booleans](#booleans)
-8. [Nil Values](#nil-values)
-9. [Constants](#constants)
-10. [Comparison and Hashing](#comparison-and-hashing)
-11. [Type Conversion](#type-conversion)
-12. [String Representation](#string-representation)
-13. [Error Handling](#error-handling)
-14. [Performance Considerations](#performance-considerations)
-15. [Examples](#examples)
+- [val C Library Reference Manual](#val-c-library-reference-manual)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+    - [Key Features](#key-features)
+  - [Core Concepts](#core-concepts)
+    - [NaN Boxing](#nan-boxing)
+    - [Pointer Tagging](#pointer-tagging)
+  - [Data Types](#data-types)
+    - [Primary Type](#primary-type)
+    - [Supported Value Types](#supported-value-types)
+  - [Boxing Operations](#boxing-operations)
+  - [Numbers](#numbers)
+    - [Type Checking](#type-checking)
+    - [Number Extraction](#number-extraction)
+    - [Example](#example)
+  - [Pointers](#pointers)
+    - [Type Checking](#type-checking-1)
+    - [Example](#example-1)
+    - [Pointer Extraction](#pointer-extraction)
+    - [Pointer Tagging](#pointer-tagging-1)
+    - [Buffer Pointers](#buffer-pointers)
+    - [Custom Pointer Types](#custom-pointer-types)
+  - [Booleans](#booleans)
+    - [Example](#example-2)
+  - [Nil Values](#nil-values)
+    - [Example](#example-3)
+  - [Constants](#constants)
+    - [Example](#example-4)
+  - [Comparison and Hashing](#comparison-and-hashing)
+    - [Equality and Comparison](#equality-and-comparison)
+    - [Hashing](#hashing)
+  - [String Representation](#string-representation)
+    - [String Conversion Type](#string-conversion-type)
+    - [Default Formatters](#default-formatters)
+    - [Examples](#examples)
+  - [Performance Considerations](#performance-considerations)
+    - [Optimization Features](#optimization-features)
+  - [Examples](#examples-1)
+    - [Complete Example: Mixed Data Container](#complete-example-mixed-data-container)
 
 ---
 
@@ -76,8 +100,6 @@ The fundamental data type that can hold any of the supported value types in NaN-
 ---
 
 ## Boxing Operations
-
-### Generic Boxing
 
 ```c
 val_t val(x);
@@ -416,15 +438,13 @@ int main()
 ---
 
 ## Booleans
-
-### Constants
+The val library provides specific val_t constants for boolean true and false values: 
 
 ```c
 static const val_t valfalse;  // Boolean false value
 static const val_t valtrue;   // Boolean true value
 ```
-
-### Type Checking
+and a function to check if a val_t holds a boolean:
 
 ```c
 int valisbool(val_t v);
@@ -448,6 +468,9 @@ int main() {
     printf("b2 is boolean: %s\n", valisbool(b2) ? "yes" : "no");
     printf("b3 is boolean: %s\n", valisbool(b3) ? "yes" : "no");
     
+    if (valtoint(b2)) { /* This will NOT be executed */ }
+    if (valtoint(b3)) { /* This will be executed */ }
+
     return 0;
 }
 ```
@@ -455,14 +478,13 @@ int main() {
 ---
 
 ## Nil Values
-
-### Constant
+The val library includes a special val_t constant to represent a "nil" or "void" state (for example the lack of a result, rather that a '0'):
 
 ```c
 static const val_t valnil;    // Nil/void value
 ```
 
-### Type Checking
+and a function to check for it.
 
 ```c
 int valisnil(val_t v);
@@ -471,41 +493,59 @@ int valisnil(val_t v);
 **Purpose**: Check if value represents nil
 **Returns**: Non-zero if `v` is `valnil`, zero otherwise
 
+### Example
+
+```c
+#include "val.h"
+#include <stdio.h>
+
+int main() {
+    val_t v_nil = valnil;
+    val_t v_null_ptr = val(NULL); // A NULL void pointer, not valnil
+    val_t v_false = valfalse;
+    val_t v_zero = val(0);
+
+    printf("valnil is nil: %s\n", valisnil(v_nil) ? "true" : "false");         // true
+    printf("val(NULL) is nil: %s\n", valisnil(v_null_ptr) ? "true" : "false"); // false
+    printf("valfalse is nil: %s\n", valisnil(v_false) ? "true" : "false");     // false
+    printf("val(0) is nil: %s\n", valisnil(v_zero) ? "true" : "false");        // false
+    return 0;
+}
+```
 ---
 
 ## Constants
 
-The library supports two types of constants that are guaranteed to be unique values:
+In addition to the predefined constants `valnil`, `valtrue`, and `valfalse`, the `val` library allows you to define custom constant `val_t` values.
 
-### Numeric Constants
+These custom constants are guaranteed to be unique and different from any other val_t value (numbers, pointers, booleans, or other constants unless explicitly defined as identical).
 
-32-bit integer constants that can be distinguished from regular integers:
+There are two types of custom constants:
+ - Numeric constants: Defined with a 32-bit integer number. These are primarily for giving unique constant identifiers rather than representing numeric data.
+ - Symbolic constants: Defined by a short string (maximum 8 characters). These are useful for creating labels, names, distinct constant values.
+  Symbolic constants can only contain digits (`0`-`9`), lowercase letters (`a-z`), the uppercase hexadecimal digits `A-F`, the upper case letters `XYZ`, and characters from the set: `!#$*+-./:<=>?@[]_`
+`
 
-```c
-val_t numeric_const = valconst(42);
-```
-
-### Symbolic Constants
-
-String constants up to 8 characters, supporting specific character sets:
-- Digits: `0-9`
-- Lowercase letters: `a-z`
-- Uppercase letters: `ABCDEFXYZ`
-- Special characters: `!#$*+-./:<=>?@[]_`
-
-```c
-val_t start_block = valconst("blk_[[");
-val_t end_block = valconst("]]_blk");
-```
-
-### Constant Operations
+You can create a constant with the `valconst()` function:
 
 ```c
 val_t valconst(x);           // Create numeric or symbolic constant
-int valisconst(val_t v);     // Check if any constant (includes valnil, valfalse, valtrue)
-int valisnumconst(val_t v);  // Check if numeric constant
-int valissymconst(val_t v);  // Check if symbolic constant
 ```
+**Purpose**: Creates a numeric/symbolic constant depending on `x`
+**Returns**: The `val_t` boxing of the constant `x`
+
+
+You can check if a value is a constant with:
+
+```c
+int valisconst(val_t v [, x]);
+int valisnumconst(val_t v[, x]);
+int valissymconst(val_t v[, x]);
+```
+
+**Purpose**: Check if value represents a constant and, if it ie equal to `x` (if specified)
+**Returns**: Non-zero if `v` is constant, zero otherwise
+
 
 ### Example
 
@@ -516,6 +556,8 @@ int valissymconst(val_t v);  // Check if symbolic constant
 int main() {
     val_t num_const = valconst(100);
     val_t sym_const = valconst("start");
+    val_t start_block = valconst("blk_[[");
+    val_t end_block = valconst("]]_blk");
     val_t regular_int = val(100);
     
     printf("num_const is constant: %s\n", valisconst(num_const) ? "yes" : "no");
@@ -524,6 +566,8 @@ int main() {
     
     printf("num_const is numeric constant: %s\n", valisnumconst(num_const) ? "yes" : "no");
     printf("sym_const is symbolic constant: %s\n", valissymconst(sym_const) ? "yes" : "no");
+    printf("num_const is 100: %s\n", valisconst(num_const,valconst(100)) ? "yes" : "no");
+    printf("num_const is 100: %s\n", valisconst(num_const,100) ? "yes" : "no");
     
     return 0;
 }
@@ -563,41 +607,18 @@ int valhash(val_t v);
 **Note**: Symbolic constants and buffers are hashed as strings
 
 ---
-
-## Type Conversion
-
-### To C Types
-
-```c
-double   valtodouble(val_t v);      // Convert to double
-int64_t  valtoint(val_t v);         // Convert to signed integer
-uint64_t valtounsignedint(val_t v); // Convert to unsigned integer
-_Bool    valtobool(val_t v);        // Convert to boolean
-```
-
-**Conversion Rules**:
-- Numbers convert to their respective values
-- Constants convert to their numeric representation where applicable
-- Non-numeric types return appropriate default values
-- Error conditions set `errno` where applicable
-
----
-
 ## String Representation
+  The function `valtostr()` make it easier to print and examone `val_t` values. 
 
 ### String Conversion Type
+The result of conversation is returned in a structure of type `valstr_t`:
 
 ```c
-typedef struct valstr_s {
-    char *str;      // Pointer to string representation
-    // ... internal fields
-} valstr_t;
+typedef struct { char str[31]; } valstr_t;
 ```
 
-### String Conversion Function
-
 ```c
-valstr_t valtostr(val_t v [, const char* format]);
+valstr_t valtostr(val_t v [, char* format]);
 ```
 
 **Purpose**: Convert any `val_t` value to its string representation
@@ -608,18 +629,19 @@ valstr_t valtostr(val_t v [, const char* format]);
 **Returns**: `valstr_t` object containing string representation
 
 ### Default Formatters
+Each type is converted using a predefined formatter. You can specify your own using the printf format specifiers.
 
 | Type | Default Format |
 |------|----------------|
 | double | `%f` |
 | integer | `%" PRId64 "` |
 | pointers | `%p` |
-| boolean | Text representation |
-| nil | Text representation |
-| symbolic constant | Direct string |
+| boolean | "`false`"/"`true`" |
+| nil | "`nil`" |
+| symbolic constant | string |
 | numeric constant | `<%" PRIX32 ">` |
 
-### Usage Patterns
+### Examples
 
 **Temporary Usage**:
 ```c
@@ -641,53 +663,22 @@ val_t number = val(7);
 printf("%s\n", valtostr(number, "%03d").str);  // Outputs: "007"
 ```
 
-### Important Notes
+⚠️ **Warning**: Do not store the `.str` pointer without keeping the `valstr_t` object in scope!
 
-⚠️ **Warning**: Do not store the `.str` pointer without keeping the `valstr_t` object:
-
+**Incorrect storage**:
 ```c
 // INCORRECT - creates dangling pointer
 val_t value = val(42);
-char *bad_ptr = valtostr(value).str;  // bad_ptr becomes invalid immediately
+char *bad_ptr = valtostr(value).str;  // bad_ptr becomes invalid immediately after
+```
 
+**Correct Storage**:
+```c
 // CORRECT - keep the object alive
 val_t value = val(42);
 valstr_t str_obj = valtostr(value);
 char *good_ptr = str_obj.str;         // valid while str_obj is in scope
 ```
-
----
-
-## Error Handling
-
-### Error Conditions
-
-The library uses standard C error handling mechanisms:
-
-- **`errno`**: Set to `EINVAL` for invalid type conversions
-- **Return Values**: Functions return sensible defaults for invalid inputs
-  - `valtodouble()` returns 0.0 for non-numbers
-  - Pointer functions return NULL for non-pointers
-  - Boolean functions return false for non-booleans
-
-### Best Practices
-
-1. **Always check types** before conversion:
-   ```c
-   if (valisnumber(v)) {
-       double d = valtodouble(v);
-       // Use d safely
-   }
-   ```
-
-2. **Check errno** after conversion functions:
-   ```c
-   errno = 0;
-   double d = valtodouble(v);
-   if (errno == EINVAL) {
-       // Handle conversion error
-   }
-   ```
 
 ---
 
@@ -699,12 +690,6 @@ The library uses standard C error handling mechanisms:
 - **O(1) complexity**: All operations execute in constant time
 - **Cache-friendly**: 64-bit values fit in single cache lines
 - **Minimal overhead**: No separate type tags or metadata
-
-### Usage Guidelines
-
-1. **Prefer type checks**: Use specific type predicates rather than generic checks
-2. **Batch operations**: Group similar operations together for better cache usage
-3. **Avoid unnecessary conversions**: Cache converted values when used multiple times
 
 ---
 
@@ -795,55 +780,6 @@ int main() {
     }
     
     val_array_destroy(container);
-    return 0;
-}
-```
-
-### Example: Custom Pointer Type
-
-```c
-#include "val.h"
-#include <stdio.h>
-#include <stdlib.h>
-
-// Define a custom structure
-typedef struct {
-    int id;
-    char name[32];
-    double value;
-} my_data_t;
-
-// Use one of the custom pointer types
-typedef struct valptr_5_s {
-    my_data_t *ptr;
-    // Additional metadata could go here
-} *my_data_ptr_t;
-
-int main() {
-    // Create some data
-    my_data_t *data = malloc(sizeof(my_data_t));
-    data->id = 123;
-    strcpy(data->name, "Test Object");
-    data->value = 456.789;
-    
-    // Box the pointer
-    val_t boxed = val((my_data_ptr_t)data);
-    
-    // Check the type
-    if (valptrtype(boxed) == VALPTR_5) {
-        printf("Successfully boxed custom pointer type\n");
-        
-        // Extract and use
-        my_data_t *extracted = (my_data_t*)valtoptr(boxed);
-        printf("ID: %d, Name: %s, Value: %f\n", 
-               extracted->id, extracted->name, extracted->value);
-        
-        // Use tagging
-        valtagptr(boxed, 7);  // Mark with tag 7
-        printf("Pointer tag: %d\n", valtagptr(boxed));
-    }
-    
-    free(data);
     return 0;
 }
 ```

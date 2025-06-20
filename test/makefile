@@ -11,7 +11,7 @@ endif
 
 DEBUG=-DDEBUG
  
-CFLAGS=-O2 -Wall -I../src -I. $(ARCH) $(STATIC) $(DEBUG)
+CFLAGS= $(XFLAGS) -O2 -Wall -I../src -I. $(ARCH) $(STATIC) $(DEBUG)
 
 TESTS_SRC=$(wildcard t_*.c)
 TESTS_RAW=$(TESTS_SRC:.c=)

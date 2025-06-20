@@ -70,7 +70,7 @@
 //        0000 0011 1111 0000
 //
 //   7FF9 93F0 Boolean          1001 0011 1111 0000
-//   7FF9 A3F0 Nil              1010 0011 1111 0000  
+//   7FF9 B3F0 Nil              1011 0011 1111 0000  
 //   7FF9 C3F0 User defined     1100 0011 1111 0000
 //   FFF9 xxxx Symbolic
 
@@ -107,7 +107,9 @@
 #define VAL_SYM_NULL       ((uint64_t)0xFFF9FFFFFFFFFFFF)
 //                                      |   |   |   |   |
 #define VAL_FALSE          ((uint64_t)0x7FF993F000000000)
-#define VAL_NIL            ((uint64_t)0x7FF9A3F000000000)
+#define VAL_NIL            ((uint64_t)0x7FF9B3F000000000)
+#define VAL_VALCONST_MASK  ((uint64_t)0xFFFFDFF000000000)
+#define VAL_VALCONST       ((uint64_t)0x7FF993F000000000)
 //                                      |   |   |   |   |
 
 // =========
@@ -193,11 +195,11 @@ typedef struct valptr_0_s *valptr_0_t;
 #define val_isptr_v2(v,t) val_isptr_2(val(v),t)
 
 static inline int val_isptr_1(val_t v)  {
-    return val_is_any_ptr(v);
+  return val_is_any_ptr(v);
 }
 
 static inline int val_isptr_2(val_t v, uint64_t ptr_type)  {
-  return (val_isptr_1(v) && (v.v & VAL_TYPE_MASK) == ptr_type); 
+  return (val_is_any_ptr(v) && (v.v & VAL_TYPE_MASK) == ptr_type); 
 }
 
 #define valisvoidptr(x)     ((val(x).v & VAL_TYPE_MASK) == VALPTR_VOID)
@@ -208,7 +210,62 @@ static inline int val_isptr_2(val_t v, uint64_t ptr_type)  {
 // The val_t corresponding of the C pointer NULL
 static const val_t valnullptr = {VALPTR_VOID};
 
+#define valptrtype(v) val_ptrtype(val(v))
+static inline uint64_t val_ptrtype(val_t v) {
+  return  val_is_any_ptr(v) ? (v.v & VAL_TYPE_MASK) : 0;
+}
+
 #define valisnullptr(x)  (valtoptr(x) == NULL)
+
+// ==== Pointer tagging
+// Except for `void *` and `char *`, any pointer can be *tagged* with 
+// a number between 0 and 7 (0 is the default tag for pointers).
+// This can be used, for example, to mark a pointer as "visited" or
+// "to be disposed" without having to resort to additional memory.
+
+
+// Define VALNOTAGPTR if pointers are not properly aligned.
+#ifdef VALNOTAGPTR
+  #define VAL_TAG_MASK  ((uint64_t)0)
+#else
+  #ifdef _MSC_VER
+    // Make up for lack of `max_align_t` in Microsoft cl
+    #define val_align_t double
+  #else 
+    #define val_align_t max_align_t
+  #endif
+
+  // We expect room for VAL_MIN_ALIGN values
+  #define VAL_MIN_ALIGN 8
+  static_assert(alignof(val_align_t) >= VAL_MIN_ALIGN, "Alignment requirements not met");
+  #define VAL_TAG_MASK  ((uint64_t)(VAL_MIN_ALIGN-1))
+
+#endif
+
+static inline int val_check_taggable_ptr(val_t v) {
+  // Not a pointer
+  if (!val_is_any_ptr(v)) return -1; 
+
+  // It's either a char or void pointer can't be tagged
+  if ((v.v & VAL_TYPE_MASK) <= VALPTR_CHAR)  return 0;
+
+  // Any other pointer is taggable
+  return 1;
+}
+
+#define valtagptr_vrg(...) VAL_vrg(val_tagptr_,__VA_ARGS__)
+#define valtagptr(...) valtagptr_vrg(__VA_ARGS__)
+static inline val_t val_tagptr_2(val_t v, int tag) {
+  if (val_check_taggable_ptr(v) > 0) 
+    v.v = (v.v & ~VAL_TAG_MASK) | (tag & VAL_TAG_MASK);
+  return v;
+}
+
+static inline int val_tagptr_1(val_t v) {
+  if (val_check_taggable_ptr(v) <= 0) return 0;
+  return (v.v & VAL_TAG_MASK);
+}
+
 
 // This is used for convenience
 static char *val_emptystr = "\0\0\0"; // FOUR nul bytes
@@ -284,28 +341,6 @@ static inline val_t val_fromval(val_t v)        {return v;}
 // This improves performance as val_t values pass through val() with no computation.
 #define val(x) _Generic((x), val_t: x, default: val_from(x))
 
-// ====== Retrieve values from a val_t variable
-#define valtodouble(v) val_todouble(val(v))
-static inline double val_todouble(val_t v) {
-  double d = 0.0; 
-  if (valisnumber(v)) memcpy(&d,&v,sizeof(double));
-  else errno = EINVAL;
-  return d;
-}
-
-#define valtoint(v)  val_toint(val(v))
-static inline int64_t val_toint(val_t v) {
-  if (valisnumber(v)) return (int64_t)val_todouble(v);
-  return (v.v & VAL_PAYLOAD_MASK);
-}
-
-#define valtounsignedint(v)  ((uint64_t)valtoint(v))
-
-#define valtobool(v) val_tobool(val(v))
-static inline  _Bool val_tobool(val_t v)  {
-  if (valisnumber(v)) return (valtodouble(v) != 0.0);
-  else return ((v.v & VAL_32BIT_MASK) != 0);
-}
 
 // ==== CONSTANTS
 
@@ -323,17 +358,18 @@ static const val_t    valnil = {VAL_NIL};
 
 
 // User defined constants
+#define valconst(x) _Generic((x), val_t: val_valconst, char *: valsymconst, default: valnumconst)(x)
+static inline val_t valnumconst(uint32_t x)  { return ((val_t){ VAL_CONST_0 | x }); }
 
-#define valconst(x) _Generic((x), val_t: val_identity, char *: valsymconst, default: valnumconst)(x)
-static inline val_t valnumconst(uint32_t x)  {return ((val_t){ VAL_CONST_0 | x }); }
+#define val_is_any_const(x) ((v.v & VAL_F7_TYPE_MASK) == VAL_CONST_ANY)
 
-static inline val_t val_identity(val_t v) {return v;}
+// Booleans and valnil
+static inline val_t val_valconst(val_t v) { return val_is_any_const(v) ? v : valnil;}
 
 #define valisconst_vrg(...) VAL_vrg(val_isconst_,__VA_ARGS__)
-
 #define valisconst(...) valisconst_vrg(__VA_ARGS__)
 
-static inline int val_isconst_1(val_t v) {return ((v.v & VAL_F7_TYPE_MASK) == VAL_CONST_ANY); }
+static inline int val_isconst_1(val_t v) {return val_is_any_const(v); }
 
 #define val_isconst_2(v,c) _Generic((c), \
                                    char *: val_issymconst_2, \
@@ -364,12 +400,13 @@ static inline int val_issymconst_2(val_t v, char * s) {
   return (val_issymconst_1(v) && (valsymconst(s).v == v.v));
 }
 
+#define VAL_STR_MAX_LEN 32
+typedef struct { char str[VAL_STR_MAX_LEN]; } valstr_t;
 
-// Syms (8 chars strings of upper/lower case, digits and '_')
+// Syms (8 chars strings)
 
-  //             1         2         3     3   4         5         6
-  //   0         0         0         0     67  0         0         0
-  //  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
+  //             1         2         3     3   4         5         6  6
+  //   0         0         0         0     67  0         0         0  3
   //  "!#$*+-./0123456789:<=>?@ABCDEFXYZ[]_abcdefghijklmnopqrstuvwxyz~"
   // Note that character `\0` is mapped to 63 (0x3F)
 
@@ -389,7 +426,7 @@ static inline val_t valsymconst(char * restrict sym_str) {
   uint64_t c = 0;
 
   if (sym_str == NULL || *sym_str == '\0') {
-    sym_val.v = VAL_SYM_0 | (uint64_t)0x3F;
+    sym_val.v = VAL_SYM_NULL;
     return sym_val;
   }
 
@@ -404,16 +441,12 @@ static inline val_t valsymconst(char * restrict sym_str) {
   if (c != 0x3F) { c = ascii_to_sym[*sym_str   & 0x7F];  sym |= (c << shift);  shift = 48;
   /* UNROLLED */ }}}}}}}
 
-  sym |= ((uint64_t)0x3F << shift);
+  sym |= (VAL_SYM_NULL << shift); // Fill with FF
   sym_val.v = VAL_SYM_0 | (sym & VAL_PAYLOAD_MASK);
   return sym_val;
 }
 
-#define VAL_STR_MAX_LEN 32
-typedef struct { char str[VAL_STR_MAX_LEN]; } valstr_t;
-
-#define valsymtostr(v) val_sym_to_str(val(v))
-static inline valstr_t val_sym_to_str(val_t v) {
+static inline valstr_t valsymtostr(val_t v) {
   valstr_t sym_str_s;
   uint64_t sym;
   int c;
@@ -441,37 +474,28 @@ static inline valstr_t val_sym_to_str(val_t v) {
   return sym_str_s;
 }
 
-
-// ==== Pointer tagging
-// Except for `void *` and `char *`, any pointer can be *tagged* with 
-// a number between 0 and 7 (0 is the default tag for pointers).
-// This can be used, for example, to mark a pointer as "visited" or
-// "to be disposed" without having to resort to additional memory.
-
-// Checks that there are at least three zero bits in memory aligned pointers
-#ifdef _MSC_VER
-  // Make up for lack of `max_align_t` in Microsoft cl
-  #define val_align_t double
-#else 
-  #define val_align_t max_align_t
-#endif
-
-#define VAL_MIN_ALIGN 8
-static_assert(alignof(val_align_t) >= VAL_MIN_ALIGN, "Alignment requirements not met");
-
-static inline int val_check_taggable_ptr(val_t v) {
-  // Not a pointer
-  if (!val_is_any_ptr(v)) return -1; 
-
-  // It's either a char or void pointer can't be tagged
-  if ((v.v & VAL_TYPE_MASK) <= VALPTR_CHAR)  return 0;
-
-  // A taggable pointer
-  return 1;
+// ====== Retrieve values from a val_t variable
+#define valtodouble(v) val_todouble(val(v))
+static inline double val_todouble(val_t v) {
+  double d = 0.0; 
+  if (valisnumber(v)) memcpy(&d,&v,sizeof(double));
+  else errno = EINVAL;
+  return d;
 }
 
-// We expect room for VAL_MIN_ALIGN values
-#define VAL_TAG_MASK  ((uint64_t)(VAL_MIN_ALIGN-1))
+#define valtoint(v)  val_toint(val(v))
+static inline int64_t val_toint(val_t v) {
+  if (valisnumber(v)) return (int64_t)val_todouble(v);
+  return (v.v & VAL_PAYLOAD_MASK);
+}
+
+#define valtounsignedint(v)  ((uint64_t)valtoint(v))
+
+#define valtobool(v) val_tobool(val(v))
+static inline  _Bool val_tobool(val_t v)  {
+  if (valisnumber(v)) return (valtodouble(v) != 0.0);
+  else return ((v.v & VAL_32BIT_MASK) != 0);
+}
 
 #define valtoptr(v) val_toptr(val(v))
 static inline   void *val_toptr(val_t v) {
@@ -485,24 +509,31 @@ static inline   void *val_toptr(val_t v) {
   return ret;
 }
 
-#define valptrtype(v) val_ptrtype(val(v))
-static inline uint64_t val_ptrtype(val_t v) {
-  return  val_is_any_ptr(v) ? (v.v & VAL_TYPE_MASK) : 0;
-}
+#define valtostr(...) VAL_vrg(val_tostr_,__VA_ARGS__)
+#define val_tostr_1(v) val_tostr_2(v,NULL)
+static inline valstr_t val_tostr_2(val_t v, char *fmt) {
+  valstr_t ret;
 
-#define valtagptr_vrg(...) VAL_vrg(val_tagptr_,__VA_ARGS__)
+  if (fmt && (*fmt == '\0'))
+         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, v.v);
+  else if (val_issymconst_1(v)) 
+         ret = valsymtostr(v);
+  else if (val_isnumconst_1(v))
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%" PRIX32 ">", (uint32_t)valtoint(v));
+  else if (val_is_any_ptr(v))
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%p", valtoptr(v));
+  else if (valisbool(v))
+         strcpy(ret.str,(v.v & 1)? "true" : "false");
+  else if (valisnil(v))
+         strcpy(ret.str,"nil");
+  else if (valisint(v))
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%" PRId64, valtoint(v));
+  else if (valisnumber(v)) 
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%f" , valtodouble(v));
+  else
+         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, v.v);
 
-#define valtagptr(...) valtagptr_vrg(__VA_ARGS__)
-
-static inline val_t val_tagptr_2(val_t v, int tag) {
-  if (val_check_taggable_ptr(v) > 0) 
-    v.v = (v.v & ~VAL_TAG_MASK) | (tag & VAL_TAG_MASK);
-  return v;
-}
-
-static inline int val_tagptr_1(val_t v) {
-  if (val_check_taggable_ptr(v) <= 0) return 0;
-  return (v.v & VAL_TAG_MASK);
+  return ret;
 }
 
 // This checks for val_t values IDENTITY
@@ -516,7 +547,7 @@ static inline char *val_get_charptr(val_t v, valstr_t *str) {
     ret = v_ptr ? *v_ptr : NULL;
   }
   else if (val_issymconst_1(v)) {
-    *str = val_sym_to_str(v);
+    *str = valsymtostr(v);
     ret = str->str;
   }
   return ret;
@@ -585,34 +616,6 @@ static inline uint32_t val_hash(val_t v) {
   }
   return hash;
 }
-
-#define valtostr(...) VAL_vrg(val_tostr_,__VA_ARGS__)
-#define val_tostr_1(v) val_tostr_2(v,NULL)
-static inline valstr_t val_tostr_2(val_t v, char *fmt) {
-  valstr_t ret;
-
-  if (fmt && (*fmt == '\0'))
-         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, v.v);
-  else if (val_issymconst_1(v)) 
-         ret = val_sym_to_str(v);
-  else if (val_isnumconst_1(v))
-         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%" PRIX32 ">", (uint32_t)valtoint(v));
-  else if (val_is_any_ptr(v))
-         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%p", valtoptr(v));
-  else if (valisbool(v))
-         strcpy(ret.str,(v.v & 1)? "true" : "false");
-  else if (valisnil(v))
-         strcpy(ret.str,"nil");
-  else if (valisint(v))
-         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%" PRId64, valtoint(v));
-  else if (valisnumber(v)) 
-         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%f" , valtodouble(v));
-  else
-         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, v.v);
-
-  return ret;
-}
-
 
 // This is needed to avoid warnings about unused static variables.
 static inline uint64_t val_usestatic()
