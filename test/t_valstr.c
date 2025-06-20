@@ -15,8 +15,8 @@ tstsuite("Val Library valtostr") {
     valstr_t v_str;
 
     tstcase("Default formatters") {
-      v = vallabel("Hello");
-      tstcheck(strcmp(valtostr(v).str,"Hello") == 0);
+      v = valconst("Hello");
+      tstcheck(strcmp(valtostr(v).str,"hello") == 0);
 
       v = val(7);
       tstcheck(strcmp(valtostr(v).str,"7") == 0);

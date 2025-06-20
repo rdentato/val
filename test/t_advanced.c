@@ -12,8 +12,11 @@
 tstsuite("Val Library Advanced Use Cases", advanced) {
     tstcase("48-bit Integer Limits") {
         // 48-bit signed integer limit is 2^47 - 1 = 140,737,488,355,327
-        int64_t max_48bit = ((int64_t)1 << 47) - 1;
+        int64_t max_48bit =  ((int64_t)1 << 47) - 1;
         int64_t min_48bit = -((int64_t)1 << 47);
+        
+        int64_t max_52bit =  ((int64_t)1 << 52) - 1;
+        int64_t min_52bit = -((int64_t)1 << 52);
         
         val_t max_val = val(max_48bit);
         val_t min_val = val(min_48bit);
@@ -22,6 +25,14 @@ tstsuite("Val Library Advanced Use Cases", advanced) {
         tstcheck(valisint(min_val), "48-bit min should be a signed integer");
         tstcheck(valtoint(max_val) == max_48bit, "48-bit max should extract correctly");
         tstcheck(valtoint(min_val) == min_48bit, "48-bit min should extract correctly");
+        
+        max_val = val(max_52bit);
+        min_val = val(min_52bit);
+        
+        tstcheck(valisint(max_val), "52-bit max should be a signed integer");
+        tstcheck(valisint(min_val), "52-bit min should be a signed integer");
+        tstcheck(valtoint(max_val) == max_52bit, "52-bit max should extract correctly");
+        tstcheck(valtoint(min_val) == min_52bit, "52-bit min should extract correctly");
     }
     
     tstcase("Memory Size Verification") {

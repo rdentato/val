@@ -11,11 +11,12 @@
 #include "val.h"
 
 // Define custom constants
-#define notfound valconst(1)
-#define end_of_list valconst(2)
+#define notfound         valconst(1)
+#define end_of_list      valconst(2)
 #define operation_failed valconst(3)
-#define custom_success valconst(4)
-#define custom_error valconst(5)
+#define custom_success   valconst(4)
+#define custom_error     valconst(5)
+#define same_custom_error valconst(5)
 
 tstsuite("Val Library Core Functionality", core) {
     tstcase("Value Creation") {
@@ -24,7 +25,7 @@ tstsuite("Val Library Core Functionality", core) {
             tstcheck(valtoint(v1) == 42, "Value should be 42");
             
             val_t v2 = val(3.14);
-            tstcheck(valisdouble(v2), "3.14 should be a double");
+            tstcheck(valisnumber(v2), "3.14 should be a double");
             tstcheck(valtodouble(v2) == 3.14, "Value should be 3.14");
             
             val_t v3 = val((_Bool)true);
@@ -72,9 +73,11 @@ tstsuite("Val Library Core Functionality", core) {
             tstcheck(valisconst(end_of_list), "end_of_list should be a custom constant");
             tstcheck(valisconst(operation_failed), "operation_failed should be a custom constant");
             
+            tstcheck(valeq(custom_error, custom_error));
             // Ensure constants with different values are not equal
             tstcheck(!valeq(notfound, end_of_list), "Different constants should not be equal");
             tstcheck(!valeq(notfound, operation_failed), "Different constants should not be equal");
             tstcheck(!valeq(end_of_list, operation_failed), "Different constants should not be equal");
+
     }
 }

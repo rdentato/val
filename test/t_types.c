@@ -20,9 +20,9 @@ tstsuite("Val Library Type Checking", type_checking) {
         val_t unsignedIntVal = val(42u);
         
         tstsection("Double Type Checking") {
-            tstcheck(valisdouble(doubleVal), "3.14 should be identified as double");
-            tstcheck(valisdouble(signedIntVal), "Integer should not be identified as double");
-            tstcheck(valisdouble(unsignedIntVal), "Unsigned integer should not be identified as double");
+            tstcheck(valisnumber(doubleVal), "3.14 should be identified as double");
+            tstcheck(valisnumber(signedIntVal), "Integer should not be identified as double");
+            tstcheck(valisnumber(unsignedIntVal), "Unsigned integer should not be identified as double");
         }
         
         tstsection("Signed Integer Type Checking") {
@@ -58,8 +58,8 @@ tstsuite("Val Library Type Checking", type_checking) {
     tstcase("Constant Type Checking") {
         tstcheck(valisconst(notfound), "notfound should be identified as a constant");
         tstcheck(valisconst(end_of_list), "end_of_list should be identified as a constant");
-        tstcheck(!valisconst(valtrue), "valtrue should not be identified as a custom constant");
-        tstcheck(!valisconst(valnil), "valnil should not be identified as a custom constant");
+        tstcheck(valisconst(valtrue), "valtrue should be identified as a custom constant");
+        tstcheck(valisconst(valnil), "valnil should be identified as a custom constant");
     }
     
     #define ITEM_LOST 123

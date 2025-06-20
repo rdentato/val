@@ -7,16 +7,23 @@
 #include <string.h>
 #include <stdint.h>
 
-// Define custom pointer types before including val.h
-// if you don't know what do they point to.
-#define valptr_1_t FILE *
-#define PTRTAG_FILE VALPTR_1
+typedef int (*mono_f)(int);
+#define valptr_0_t mono_f
+#define ismono_f(v) valisptr(v,VALPTR_0)
+
+typedef int (*couple_f)(int,int);
+#define valptr_1_t couple_f
+#define iscouple_f(v) valisptr(v,VALPTR_1)
+
+int f1(int a, int b) {return a;}
+int f2(int a, int b) {return b;}
 
 #include "val.h"
 
 // Or after inclusion to define your own struct (the most common case)
 typedef struct  valptr_2_s { int x; int y; } *point_t;
 #define PTRTAG_POINT VALPTR_2
+
 
 tstsuite("Val Library pointers", advanced) {
     tstcase("48-bit Pointer Storage") {
@@ -44,9 +51,9 @@ tstsuite("Val Library pointers", advanced) {
         val_t file_val = val(file);
         
         tstcheck(valisptr(file_val), "FILE* should be identified as a pointer");
-        tstcheck(valisptr(file_val, PTRTAG_FILE), "FILE* should be identified as a pointer 1");
+        tstcheck(valisptr(file_val, VALPTR_FILE), "FILE* should be identified as a pointer 1");
         tstcheck(valtoptr(file_val) == file, "FILE* should be extracted correctly");
-        tstcheck(valisptr(stdout,PTRTAG_FILE));
+        tstcheck(valisptr(stdout,VALPTR_FILE));
         fclose(file);
     }
     
@@ -88,5 +95,15 @@ tstsuite("Val Library pointers", advanced) {
         tstcheck((valtagptr(void_val) == 0), "Expect 0 got %d",valtagptr(void_val));
 
         free(point);
+    }
+
+    tstcase("function pointers") {
+        val_t v_arr[2];
+
+        v_arr[0] = val(f1);
+        v_arr[1] = val(f2);
+
+        tstcheck(iscouple_f(v_arr[1]));
+        tstcheck(valeq(f1,v_arr[0]));
     }
 }

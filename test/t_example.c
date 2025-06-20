@@ -68,7 +68,7 @@ tstsuite("Val Library Real-world Usage", usage) {
         tstcheck(valtoint(result) == 42, "Should return 42");
         
         result = lookup("double");
-        tstcheck(valisdouble(result), "Should return a double");
+        tstcheck(valisnumber(result), "Should return a double");
         tstcheck(valtodouble(result) == 3.14, "Should return 3.14");
         
         result = lookup("bool");
@@ -103,7 +103,7 @@ tstsuite("Val Library Real-world Usage", usage) {
         val_t back_b = val(b);
         
         // Verify types
-        tstcheck(valisdouble(back_d), "Should be a double");
+        tstcheck(valisnumber(back_d), "Should be a double");
         tstcheck(valisint(back_i), "Should be a signed integer");
         tstcheck(valisint(back_u), "Should be an unsigned integer");
         tstcheck(valisbool(back_b), "Should be a boolean");

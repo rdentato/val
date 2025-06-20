@@ -26,7 +26,7 @@ All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 ## Features
 
 * **Compact representation**: 64-bit `val_t` uses NaN payload bits.
-* **Fast type checks**: Macro utilities like `valisdouble()`, `valisinteger()`, `valisptr()`, `valisbool()`, `valisnil()`.
+* **Fast type checks**: Macro utilities like `valisnumber()`, `valisinteger()`, `valisptr()`, `valisbool()`, `valisnil()`.
 * **Generic constructors**:
 
   ```c
@@ -77,7 +77,7 @@ int main(void) {
     val_t s = val("NaN-boxing");
 
     // Type checks
-    assert(valisdouble(d));
+    assert(valisnumber(d));
     assert(valisint(i));
     assert(valisint(u));
     assert(valisbool(b));
