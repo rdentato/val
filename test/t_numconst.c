@@ -12,8 +12,8 @@
 typedef enum color_e {COLOR = 0x10000000, RED, GREEN, BLUE } color_t;
 typedef enum direction_e {DIRECTION = 0x20000000, NORTH, SOUTH, EAST, WEST} direction_t;
 
-#define iscolor(v)     (valtoint(v) & COLOR)
-#define isdirection(v) (valtoint(v) & DIRECTION)
+#define iscolor(v)     (valtouint32(v) & COLOR)
+#define isdirection(v) (valtouint32(v) & DIRECTION)
 
 tstsuite("Val Library syms") {
     valstr_t num_vstr;
@@ -27,6 +27,7 @@ tstsuite("Val Library syms") {
       num_vstr = valtostr(num);
       n = valtounsignedint(num);
       tstcheck(n == 721);
+      tstcheck(valtounsignedint(num) == 721);
       tstnote("Hello: %016" PRIX64 "  \"%s\"", num.v, num_vstr.str);
       tstnote("Hello: %016" PRIX64 "  \"%s\"", num.v, valtostr(num).str);
 
@@ -39,6 +40,10 @@ tstsuite("Val Library syms") {
       tstcheck(valisconst(valnil));
       tstcheck(valisconst(valtrue));
       tstcheck(valisconst(valfalse));
+
+      tstcheck(valtoint(valnil) == 0);
+      tstcheck(valtoint(valtrue) == 1);
+      tstcheck(valtoint(valfalse) == 0);
 
       val_t notconst = val(12);
 

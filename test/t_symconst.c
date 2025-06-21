@@ -83,4 +83,14 @@ tstsuite("Val Library syms") {
       tstcheck(valhash(sym) == valhash("hello"));
     }
 
+    tstcase("toint") {
+      sym = valconst("87654321");
+      tstcheck(valtoint(sym) > ((uint64_t)1 << 40));
+      tstnote("%016" PRIX64 " sym: '%s'",sym.v,valtostr(sym).str);
+
+      sym = valconst(">>");
+      tstcheck(valtoint(sym) > ((uint64_t)1 << 40));
+      tstnote("%016" PRIX64 " sym: '%s'",sym.v,valtostr(sym).str);
+    }
+
 }

@@ -361,7 +361,11 @@ static const val_t    valnil = {VAL_NIL};
 #define valconst(x) _Generic((x), val_t: val_valconst, char *: valsymconst, default: valnumconst)(x)
 static inline val_t valnumconst(uint32_t x)  { return ((val_t){ VAL_CONST_0 | x }); }
 
+// This checks if val is any numeric or symbolic const, including valnil, valtrue and valfalse
 #define val_is_any_const(x) ((v.v & VAL_F7_TYPE_MASK) == VAL_CONST_ANY)
+
+// This checks if val is a numeric const or any of valnil, valtrue and valfalse
+#define val_is_any_NV_const(x) ((v.v & VAL_TYPE_MASK) == VAL_CONST_ANY)
 
 // Booleans and valnil
 static inline val_t val_valconst(val_t v) { return val_is_any_const(v) ? v : valnil;}
@@ -478,18 +482,29 @@ static inline valstr_t valsymtostr(val_t v) {
 #define valtodouble(v) val_todouble(val(v))
 static inline double val_todouble(val_t v) {
   double d = 0.0; 
-  if (valisnumber(v)) memcpy(&d,&v,sizeof(double));
+  if (val_isnumber(v)) memcpy(&d,&v,sizeof(double));
   else errno = EINVAL;
   return d;
 }
 
 #define valtoint(v)  val_toint(val(v))
 static inline int64_t val_toint(val_t v) {
-  if (valisnumber(v)) return (int64_t)val_todouble(v);
+  if (val_isnumber(v)) {
+    double d;
+    memcpy(&d,&v,sizeof(double));
+    return (int64_t)d;
+  }
+  if (val_is_any_NV_const(v)) { // Only the lower 32bits
+    return (v.v & VAL_32BIT_MASK);  
+  }
+  // Pointers and symbolic const are returned on 48 bits.
   return (v.v & VAL_PAYLOAD_MASK);
 }
 
 #define valtounsignedint(v)  ((uint64_t)valtoint(v))
+
+#define valtoint32(x)  ((int32_t)valtoint(x))
+#define valtouint32(x) ((uint32_t)valtoint(x))
 
 #define valtobool(v) val_tobool(val(v))
 static inline  _Bool val_tobool(val_t v)  {
