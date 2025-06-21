@@ -3,7 +3,7 @@
 
 
 #ifndef VAL_VERSION
-#define VAL_VERSION 0x0003008B
+#define VAL_VERSION 0x0004003C
 
 #include <stdio.h>
 #include <stdint.h>
@@ -133,16 +133,16 @@ static_assert(sizeof(val_t) == 8, "Wrong size for uint64_t");
 // All non-NaN numbers are doubles except VAL_DBLNAN_NEG and VAL_DBLNAN_POS
 #define valisnumber(x) val_isnumber(val(x)) 
 static inline int val_isnumber(val_t v) {
-  return ((v.v & VAL_NAN_MASK) != VAL_NAN_MASK)
-      || ((v.v & VAL_DBLNAN_MASK) == VAL_DBLNAN_POS); // The result of expressions like 0.0/0.0
+  return (((v).v & VAL_NAN_MASK) != VAL_NAN_MASK)
+      || (((v).v & VAL_DBLNAN_MASK) == VAL_DBLNAN_POS); // The result of expressions like 0.0/0.0
 }
 
 // By effect of the IEEE 754 standard, only integers up to 52 bits are representable.
 // We'll check directly on the bit represantation of doubles. See IEEE754.md in the docs direcotory
 #define valisint(x) val_isint(val(x))
 static inline int val_isint(val_t v) {
-  int      exp_bits  = (int)((v.v >> 52) & 0x7FF);          // Extract the exponent (11 bits)
-  uint64_t frac_bits = v.v & ((((uint64_t)1) << 52) - 1);   // Extract the fraction field (52 bits)
+  int      exp_bits  = (int)(((v).v >> 52) & 0x7FF);          // Extract the exponent (11 bits)
+  uint64_t frac_bits = (v).v & ((((uint64_t)1) << 52) - 1);   // Extract the fraction field (52 bits)
 
   if (exp_bits == 0)     return (frac_bits == 0);           // If exponent is 0 and the fractional part is 0 then it's an integer.
   if (exp_bits == 0x7FF) return 0;                          // If exponent is all 1, then it's a NaN, hence not an integer
@@ -199,7 +199,7 @@ static inline int val_isptr_1(val_t v)  {
 }
 
 static inline int val_isptr_2(val_t v, uint64_t ptr_type)  {
-  return (val_is_any_ptr(v) && (v.v & VAL_TYPE_MASK) == ptr_type); 
+  return (val_is_any_ptr(v) && ((v).v & VAL_TYPE_MASK) == ptr_type); 
 }
 
 #define valisvoidptr(x)     ((val(x).v & VAL_TYPE_MASK) == VALPTR_VOID)
@@ -212,7 +212,7 @@ static const val_t valnullptr = {VALPTR_VOID};
 
 #define valptrtype(v) val_ptrtype(val(v))
 static inline uint64_t val_ptrtype(val_t v) {
-  return  val_is_any_ptr(v) ? (v.v & VAL_TYPE_MASK) : 0;
+  return  val_is_any_ptr(v) ? ((v).v & VAL_TYPE_MASK) : 0;
 }
 
 #define valisnullptr(x)  (valtoptr(x) == NULL)
@@ -247,7 +247,7 @@ static inline int val_check_taggable_ptr(val_t v) {
   if (!val_is_any_ptr(v)) return -1; 
 
   // It's either a char or void pointer can't be tagged
-  if ((v.v & VAL_TYPE_MASK) <= VALPTR_CHAR)  return 0;
+  if (((v).v & VAL_TYPE_MASK) <= VALPTR_CHAR)  return 0;
 
   // Any other pointer is taggable
   return 1;
@@ -257,13 +257,13 @@ static inline int val_check_taggable_ptr(val_t v) {
 #define valtagptr(...) valtagptr_vrg(__VA_ARGS__)
 static inline val_t val_tagptr_2(val_t v, int tag) {
   if (val_check_taggable_ptr(v) > 0) 
-    v.v = (v.v & ~VAL_TAG_MASK) | (tag & VAL_TAG_MASK);
+    (v).v = ((v).v & ~VAL_TAG_MASK) | (tag & VAL_TAG_MASK);
   return v;
 }
 
 static inline int val_tagptr_1(val_t v) {
   if (val_check_taggable_ptr(v) <= 0) return 0;
-  return (v.v & VAL_TAG_MASK);
+  return ((v).v & VAL_TAG_MASK);
 }
 
 
@@ -276,7 +276,7 @@ static char *val_emptystr = "\0\0\0"; // FOUR nul bytes
 // We only store floating point numbers as doubles since it is guaranteed by the
 // C Standard (C11/C17 § 6.3.1.5 [Real floating types]), that any float (4-byte
 // floating point real number) can be exactly represented as a double (8 bytes number).
-
+                                                // memcpy will (most probably) optimized by the compiler
 static inline val_t val_fromdouble(double v)    {val_t ret; memcpy(&ret,&v,sizeof(val_t)); return ret;}
 static inline val_t val_fromfloat(float f)      {return val_fromdouble((double)f);}
 static inline val_t val_fromint(int64_t v)      {return val_fromdouble((double)v);}
@@ -303,37 +303,27 @@ static inline val_t val_frombool(_Bool v)       {val_t ret; ret.v = VAL_FALSE | 
 // VALUES (identity)
 static inline val_t val_fromval(val_t v)        {return v;}
 
-#define val_from(x) _Generic((x), int: val_fromint,        \
-                                 char: val_fromint,        \
-                          signed char: val_fromint,        \
-                                short: val_fromint,        \
-                                 long: val_fromint,        \
-                            long long: val_fromint,        \
-                         unsigned int: val_fromuint,       \
-                        unsigned char: val_fromuint,       \
-                       unsigned short: val_fromuint,       \
-                        unsigned long: val_fromuint,       \
-                   unsigned long long: val_fromuint,       \
-                                _Bool: val_frombool,       \
-                               double: val_fromdouble,     \
-                                float: val_fromfloat,      \
-                                char*: val_fromcharptr,    \
-                         signed char*: val_fromcharptr,    \
-                       unsigned char*: val_fromcharptr,    \
-                               FILE *: val_fromfileptr,    \
-                         valptr_buf_t: val_frombufptr,     \
-                           valptr_7_t: val_fromptr_7,      \
-                           valptr_6_t: val_fromptr_6,      \
-                           valptr_5_t: val_fromptr_5,      \
-                           valptr_4_t: val_fromptr_4,      \
-                           valptr_3_t: val_fromptr_3,      \
-                           valptr_2_t: val_fromptr_2,      \
-                           valptr_1_t: val_fromptr_1,      \
-                           valptr_0_t: val_fromptr_0,      \
-                               void *: val_frompvoidtr,    \
-                                val_t: val_fromval  ,      \
-                              default: val_frompvoidtr     \
-                    ) (x)
+#define val_from(x) _Generic((x),  \
+           int: val_fromint,       unsigned int:       val_fromuint, \
+          char: val_fromint,       unsigned char:      val_fromuint, \
+   signed char: val_fromint,       \
+         short: val_fromint,       unsigned short:     val_fromuint, \
+          long: val_fromint,       unsigned long:      val_fromuint, \
+     long long: val_fromint,       unsigned long long: val_fromuint, \
+         _Bool: val_frombool,      \
+        double: val_fromdouble,    \
+         float: val_fromfloat,     \
+         char*: val_fromcharptr,   unsigned char*: val_fromcharptr,  \
+  signed char*: val_fromcharptr,   \
+        FILE *: val_fromfileptr,   \
+  valptr_buf_t: val_frombufptr,    \
+    valptr_7_t: val_fromptr_7,     valptr_6_t: val_fromptr_6,        \
+    valptr_5_t: val_fromptr_5,     valptr_4_t: val_fromptr_4,        \
+    valptr_3_t: val_fromptr_3,     valptr_2_t: val_fromptr_2,        \
+    valptr_1_t: val_fromptr_1,     valptr_0_t: val_fromptr_0,        \
+         val_t: val_fromval  ,     \
+        void *: val_frompvoidtr,   \
+       default: val_frompvoidtr    ) (x)
 
 // In val(x), the C11 standard (§6.5.1.1) guarantess that x is only evaluated once.
 // The first occurence will not be evaluated as only its type is considered
@@ -344,15 +334,13 @@ static inline val_t val_fromval(val_t v)        {return v;}
 
 // ==== CONSTANTS
 
-
 // Booleans
-
 static const val_t valfalse = {VAL_FALSE};
 static const val_t valtrue  = {VAL_FALSE | 1};
 
 #define valisbool(x) ((val(x).v & VAL_CONSTTYPE_MASK) == VAL_FALSE)
 
-// A nil value to signal a void value
+// NIL A nil value to signal a void value
 static const val_t    valnil = {VAL_NIL};
 #define valisnil(x)   ((val(x).v == VAL_NIL))
 
@@ -362,10 +350,10 @@ static const val_t    valnil = {VAL_NIL};
 static inline val_t valnumconst(uint32_t x)  { return ((val_t){ VAL_CONST_0 | x }); }
 
 // This checks if val is any numeric or symbolic const, including valnil, valtrue and valfalse
-#define val_is_any_const(x) ((v.v & VAL_F7_TYPE_MASK) == VAL_CONST_ANY)
+#define val_is_any_const(x) (((v).v & VAL_F7_TYPE_MASK) == VAL_CONST_ANY)
 
 // This checks if val is a numeric const or any of valnil, valtrue and valfalse
-#define val_is_any_NV_const(x) ((v.v & VAL_TYPE_MASK) == VAL_CONST_ANY)
+#define val_is_any_NV_const(x) (((v).v & VAL_TYPE_MASK) == VAL_CONST_ANY)
 
 // Booleans and valnil
 static inline val_t val_valconst(val_t v) { return val_is_any_const(v) ? v : valnil;}
@@ -380,28 +368,29 @@ static inline int val_isconst_1(val_t v) {return val_is_any_const(v); }
                                   default: val_isnumconst_2 \
                            ) (valconst(v),c)
 
-// Num
+// Numeric constants
+
+#define val_is_num_const(v) (((v).v & VAL_CONSTTYPE_MASK) == VAL_CONST_0)
 
 #define valisnumconst(...) VAL_vrg(val_isnumconst_,__VA_ARGS__)
-
 static inline int val_isnumconst_1(val_t v) { 
-  return ((v.v & VAL_CONSTTYPE_MASK) == VAL_CONST_0);
+  return val_is_num_const(v);
 }
 
 static inline int val_isnumconst_2(val_t v, uint32_t x) { 
-  return val_isnumconst_1(v) && ((v.v & VAL_32BIT_MASK) == x);
+  return val_is_num_const(v) && (((v).v & VAL_32BIT_MASK) == x);
 }
 
 static inline val_t valsymconst(char * restrict sym_str) ;
 
+#define val_is_sym_const(v) (((v).v & VAL_TYPE_MASK) == VAL_SYM_0)
 #define valissymconst(...)  VAL_vrg(val_issymconst_,__VA_ARGS__)
-
 static inline int val_issymconst_1(val_t v) {
-  return ((v.v & VAL_TYPE_MASK) == VAL_SYM_0);
+  return val_is_sym_const(v);
 }
 
 static inline int val_issymconst_2(val_t v, char * s) {
-  return (val_issymconst_1(v) && (valsymconst(s).v == v.v));
+  return (val_is_sym_const(v) && (valsymconst(s).v == (v).v));
 }
 
 #define VAL_STR_MAX_LEN 32
@@ -416,7 +405,7 @@ typedef struct { char str[VAL_STR_MAX_LEN]; } valstr_t;
 
 static inline val_t valsymconst(char * restrict sym_str) {
   val_t sym_val = {0};
-  uint64_t sym = 0;
+
   static const uint8_t ascii_to_sym[128] = {
     0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
     0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
@@ -427,55 +416,47 @@ static inline val_t valsymconst(char * restrict sym_str) {
     0x3F, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32,
     0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3F, 0x3F, 0x3F, 0x3E, 0x3F
   };
-  uint64_t c = 0;
 
   if (sym_str == NULL || *sym_str == '\0') {
     sym_val.v = VAL_SYM_NULL;
     return sym_val;
   }
 
-  int shift = 0;
-                   c = ascii_to_sym[*sym_str++ & 0x7F];  sym |= (c << shift);  shift =  6;
-  if (c != 0x3F) { c = ascii_to_sym[*sym_str++ & 0x7F];  sym |= (c << shift);  shift = 12;
-  if (c != 0x3F) { c = ascii_to_sym[*sym_str++ & 0x7F];  sym |= (c << shift);  shift = 18;
-  if (c != 0x3F) { c = ascii_to_sym[*sym_str++ & 0x7F];  sym |= (c << shift);  shift = 24;
-  if (c != 0x3F) { c = ascii_to_sym[*sym_str++ & 0x7F];  sym |= (c << shift);  shift = 30;
-  if (c != 0x3F) { c = ascii_to_sym[*sym_str++ & 0x7F];  sym |= (c << shift);  shift = 36;
-  if (c != 0x3F) { c = ascii_to_sym[*sym_str++ & 0x7F];  sym |= (c << shift);  shift = 42;
-  if (c != 0x3F) { c = ascii_to_sym[*sym_str   & 0x7F];  sym |= (c << shift);  shift = 48;
-  /* UNROLLED */ }}}}}}}
+  int      shift = 0;
+  uint8_t  c = 0;
+  uint64_t sym_64 = 0;
 
-  sym |= (VAL_SYM_NULL << shift); // Fill with FF
-  sym_val.v = VAL_SYM_0 | (sym & VAL_PAYLOAD_MASK);
+  for (int i = 0; i<8 ; i++, shift += 6) {
+    if ((c = ascii_to_sym[*sym_str++ & 0x7F]) == 0x3F) break;
+    sym_64 |= (((uint64_t)c) << shift);
+  }
+
+  sym_64 |= (VAL_SYM_NULL << shift); // Fill with FF
+  sym_val.v = VAL_SYM_0 | (sym_64 & VAL_PAYLOAD_MASK);
   return sym_val;
 }
 
 static inline valstr_t valsymtostr(val_t v) {
-  valstr_t sym_str_s;
-  uint64_t sym;
-  int c;
-  char *sym_str = sym_str_s.str;
+  valstr_t sym_vstr;
+  uint64_t sym_64;
+  char *s_ptr = sym_vstr.str;
 
-  if (((v.v & VAL_TYPE_MASK) == VAL_SYM_0)) {
+  if ((((v).v & VAL_TYPE_MASK) == VAL_SYM_0)) {
                                     //           1         2         3     33  4         5         6  6
                                     // 0         0         0         0     67  0         0         0  3
     static const char *sym_to_ascii = "!#$*+-./0123456789:<=>?@ABCDEFXYZ[]_abcdefghijklmnopqrstuvwxyz~";
     
                                      // Ensure there's a terminator
-    sym = (v.v & VAL_PAYLOAD_MASK) | (uint64_t)0x003F000000000000 ;
+    sym_64 = ((v).v & VAL_PAYLOAD_MASK);
     
-    if ((c = sym_to_ascii[sym & 0x3F])) { *sym_str++ = c;  sym >>= 6;
-    if ((c = sym_to_ascii[sym & 0x3F])) { *sym_str++ = c;  sym >>= 6;
-    if ((c = sym_to_ascii[sym & 0x3F])) { *sym_str++ = c;  sym >>= 6;
-    if ((c = sym_to_ascii[sym & 0x3F])) { *sym_str++ = c;  sym >>= 6;
-    if ((c = sym_to_ascii[sym & 0x3F])) { *sym_str++ = c;  sym >>= 6;
-    if ((c = sym_to_ascii[sym & 0x3F])) { *sym_str++ = c;  sym >>= 6;
-    if ((c = sym_to_ascii[sym & 0x3F])) { *sym_str++ = c;  sym >>= 6;
-    if ((c = sym_to_ascii[sym & 0x3F])) { *sym_str++ = c;  sym >>= 6;
-    /* UNROLLED */                      }}}}}}}}
+    for (int i=0; i<8; i++, s_ptr++) {
+      if ((*s_ptr = sym_to_ascii[sym_64 & 0x3F]) == '\0') break;
+      sym_64 >>= 6;
+    }
+
   }
-  *sym_str = '\0';
-  return sym_str_s;
+  *s_ptr = '\0';
+  return sym_vstr;
 }
 
 // ====== Retrieve values from a val_t variable
@@ -495,10 +476,10 @@ static inline int64_t val_toint(val_t v) {
     return (int64_t)d;
   }
   if (val_is_any_NV_const(v)) { // Only the lower 32bits
-    return (v.v & VAL_32BIT_MASK);  
+    return ((v).v & VAL_32BIT_MASK);  
   }
   // Pointers and symbolic const are returned on 48 bits.
-  return (v.v & VAL_PAYLOAD_MASK);
+  return ((v).v & VAL_PAYLOAD_MASK);
 }
 
 #define valtounsignedint(v)  ((uint64_t)valtoint(v))
@@ -509,19 +490,22 @@ static inline int64_t val_toint(val_t v) {
 #define valtobool(v) val_tobool(val(v))
 static inline  _Bool val_tobool(val_t v)  {
   if (valisnumber(v)) return (valtodouble(v) != 0.0);
-  else return ((v.v & VAL_32BIT_MASK) != 0);
+  else return (((v).v & VAL_32BIT_MASK) != 0);
 }
 
 #define valtoptr(v) val_toptr(val(v))
 static inline   void *val_toptr(val_t v) {
-  uint64_t mask = VAL_PAYLOAD_MASK;
+  int taggable = val_check_taggable_ptr(v);
 
-  switch (val_check_taggable_ptr(v)) {
-    case -1: errno = EINVAL; return NULL; // Not a pointer
-    case  1: mask &= ~VAL_TAG_MASK; // taggable ptr. Need to eliminate the tag!
+  if (taggable >= 0) { 
+    uint64_t ret_64 = (v).v & VAL_PAYLOAD_MASK;
+
+    if (taggable) ret_64 &= ~VAL_TAG_MASK; // Need to eliminate the tag!
+    return (void*)(uintptr_t)ret_64;
   }
-  void * ret = (void *)((uintptr_t)(v.v & mask));
-  return ret;
+
+  errno = EINVAL; 
+  return NULL; 
 }
 
 #define valtostr(...) VAL_vrg(val_tostr_,__VA_ARGS__)
@@ -530,15 +514,15 @@ static inline valstr_t val_tostr_2(val_t v, char *fmt) {
   valstr_t ret;
 
   if (fmt && (*fmt == '\0'))
-         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, v.v);
-  else if (val_issymconst_1(v)) 
+         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, (v).v);
+  else if (val_is_sym_const(v)) 
          ret = valsymtostr(v);
-  else if (val_isnumconst_1(v))
+  else if (val_is_num_const(v))
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%" PRIX32 ">", (uint32_t)valtoint(v));
   else if (val_is_any_ptr(v))
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%p", valtoptr(v));
   else if (valisbool(v))
-         strcpy(ret.str,(v.v & 1)? "true" : "false");
+         strcpy(ret.str,((v).v & 1)? "true" : "false");
   else if (valisnil(v))
          strcpy(ret.str,"nil");
   else if (valisint(v))
@@ -546,7 +530,7 @@ static inline valstr_t val_tostr_2(val_t v, char *fmt) {
   else if (valisnumber(v)) 
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%f" , valtodouble(v));
   else
-         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, v.v);
+         snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, (v).v);
 
   return ret;
 }
@@ -561,7 +545,7 @@ static inline char *val_get_charptr(val_t v, valstr_t *str) {
     char **v_ptr = valtoptr(v);
     ret = v_ptr ? *v_ptr : NULL;
   }
-  else if (val_issymconst_1(v)) {
+  else if (val_is_sym_const(v)) {
     *str = valsymtostr(v);
     ret = str->str;
   }
@@ -619,7 +603,7 @@ static inline uint32_t val_hash(val_t v) {
     }
   }
   else {
-    uint64_t h = v.v;
+    uint64_t h = (v).v;
     /* 64→64-bit MurmurHash3 “fmix” finalizer */
     h ^= h >> 33;
     h *= (uint64_t)0XFF51AFD7ED558CCD;

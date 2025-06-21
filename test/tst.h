@@ -9,17 +9,10 @@
   /* Microsoft cl compiler */
   #pragma warning(disable:4100)
   #pragma warning(disable:4189)
+  #pragma warning(disable:4152)
   #pragma warning(disable:4244)
   #pragma warning(disable:4459)
   #pragma warning(disable:4996)  
-#endif
-
-#ifdef __POCC__
-  /* Pelles pocc compiler */
-  //#pragma warn(disable:2014)
-  #pragma warn(disable:2250)
-  #pragma warn(disable:2287)
-  #pragma warn(disable:2804)
 #endif
 
 #ifdef __cplusplus

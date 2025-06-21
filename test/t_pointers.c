@@ -97,6 +97,7 @@ tstsuite("Val Library pointers", advanced) {
         free(point);
     }
 
+    // Note that this is outside the C standard as you are not supposed to mix function pointers and object pointers.
     tstcase("function pointers") {
         val_t v_arr[2];
 
