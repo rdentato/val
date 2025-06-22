@@ -1,6 +1,6 @@
 # val — A NaN-Boxed Dynamic Value Library for C
 
-[![Version](https://img.shields.io/badge/version-0.4.012-RC-blue.svg)](https://github.com/rdentato/val)
+[![Version](https://img.shields.io/badge/version-0.4.009%20RC-blue.svg)](https://github.com/rdentato/val)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 `val` is a single-header, zero-dependency library that implements a dynamic **`val_t`** type for C programs via **NaN-boxing**. It can store:
