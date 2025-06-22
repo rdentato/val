@@ -41,8 +41,11 @@ VER_VAL_H_FULL="#define VAL_VERSION ${VER_VAL_H}"
 VER_VAL_SPDX_FULL="PackageVersion: ${VER_SPDX}"
 VER_README_FULL="[![Version](https:\/\/img.shields.io\/badge\/version-${VER_README}-blue.svg)](https:\/\/github.com\/rdentato\/val)"
 
+VER_DATE=`date -u '+%Y-%m-%dT%H:%M:%SZ'`
+
 sed -i -e "s/^#define VAL_VERSION .*/${VER_VAL_H_FULL}/" src/val.h
 sed -i -e "s/^PackageVersion: .*/${VER_VAL_SPDX_FULL}/" val.spdx
+sed -i -e "s/^Created: .*/Created: ${VER_DATE}/" val.spdx
 sed -i -e "s/^\[!\[Version\].*/${VER_README_FULL}/" README.md
 
-echo "Val version set to: ${VER_SPDX}"
+echo "Val version set to: ${VER_SPDX} on ${VER_DATE}"
