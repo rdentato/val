@@ -23,11 +23,17 @@ tstsuite("Val Library syms") {
     tstcase("Create a num") {
       num = valconst(721);
       tstcheck(valisconst(num,721));
-
       num_vstr = valtostr(num);
+
       n = valtounsignedint(num);
       tstcheck(n == 721);
       tstcheck(valtounsignedint(num) == 721);
+      tstcheck(valisconst(num));
+      tstcheck(valisnumconst(num));
+      tstcheck(!valisbool(num));
+      tstcheck(!valisnil(num));
+      tstcheck(!valissymconst(num));
+
       tstnote("Hello: %016" PRIX64 "  \"%s\"", num.v, num_vstr.str);
       tstnote("Hello: %016" PRIX64 "  \"%s\"", num.v, valtostr(num).str);
 

@@ -20,8 +20,12 @@ tstsuite("Val Library syms") {
       for (int i = 8; i>=0; i--) {
         sym = valconst(s+i);
         sym_vstr = valtostr(sym);
-        tstnote("%d %d %8s: %016" PRIX64 "  \"%s\"", i, valissymconst(sym), s+i, sym.v, sym_vstr.str);
+        tstnote("%d %d %10s: %016" PRIX64 "  \"%s\"", 8-i, valissymconst(sym), s+i, sym.v, sym_vstr.str);
       }
+      s = "987654321";
+      sym = valconst(s);
+      sym_vstr = valtostr(sym);
+      tstnote("%d %d %10s: %016" PRIX64 "  \"%s\"", 9, valissymconst(sym), s, sym.v, sym_vstr.str);
 
     }
 

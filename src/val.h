@@ -3,7 +3,7 @@
 
 
 #ifndef VAL_VERSION
-#define VAL_VERSION 0x0004003C
+#define VAL_VERSION 0x0004012C
 
 #include <stdio.h>
 #include <stdint.h>
@@ -50,12 +50,14 @@
 //  the IEEE standard only requires that a NaN is produced, without specifying which one.
 //  However, the assumption should work reasonably well for most modern computers.
 // 
-//  The encoding scheme is as follows:
+//  The encoding scheme is designed to optimize the tests needed to check that an element has a
+//  certain type and it is as follows:
+//
 //           |                     |                     | Ptr |                                |
 //           |           7F_       |          FF_        | Tag |     Note                       |
 //           |---------------------|---------------------|-----|--------------------------------|
 //  _F8 1000 |         NAN         |        -NAN         | N/A | Reserved for FPU NAN           |
-//  _F9 1001 |      constants      |    Symbolic const   | N/A |                                |
+//  _F9 1001 |      constants      |      (reserved)     | N/A | Reserved for future exapnsion  |
 //  _FA 1010 |        void *       |        char *       | NO  | Predefined pointer types       |
 //  _FB 1011 |        FILE *       |     valptr_buf_t    | YES | Predefined pointer types       |
 //  _FC 1100 |      valptr_7_t     |      valptr_6_t     | YES | Library/User defined pointers  |
@@ -66,13 +68,14 @@
 //        4       4         3         2         1
 //        7       0         2         4         6         8         0
 //        xxxx xYxx xxxY xxxx xYxx xxxY xxxx xYxx xxxY xxxx xYxx xxxY 
-//      
 //        0000 0011 1111 0000
+//
+//   Constants subtypes:
 //
 //   7FF9 93F0 Boolean          1001 0011 1111 0000
 //   7FF9 B3F0 Nil              1011 0011 1111 0000  
 //   7FF9 C3F0 User defined     1100 0011 1111 0000
-//   FFF9 xxxx Symbolic
+//   7FF9 xxxx Symbolic
 
 //                                      |   |   |   |   |
 #define VAL_NAN_MASK       ((uint64_t)0x7FF0000000000000)
@@ -103,13 +106,18 @@
 #define VAL_CONST_ANY      ((uint64_t)0x7FF9000000000000)
 //                                      |   |   |   |   |
 #define VAL_CONST_0        ((uint64_t)0x7FF9C3F000000000)
-#define VAL_SYM_0          ((uint64_t)0xFFF9000000000000)
-#define VAL_SYM_NULL       ((uint64_t)0xFFF9FFFFFFFFFFFF)
+//                                      |   |   |   |   |
+#define VAL_SYM_0          ((uint64_t)0x7FF9000000000000)
+#define VAL_SYM_NULL       ((uint64_t)0x7FF9FFFFFFFFFFFF)
+#define VAL_SYM_MASK       ((uint64_t)0x00000FF000000000)
+#define VAL_SYM_NOT        ((uint64_t)0x000003F000000000)
 //                                      |   |   |   |   |
 #define VAL_FALSE          ((uint64_t)0x7FF993F000000000)
 #define VAL_NIL            ((uint64_t)0x7FF9B3F000000000)
 #define VAL_VALCONST_MASK  ((uint64_t)0xFFFFDFF000000000)
 #define VAL_VALCONST       ((uint64_t)0x7FF993F000000000)
+#define VAL_CONST_NV_MASK  ((uint64_t)0xFFFF0FFF00000000)
+#define VAL_CONST_NV       ((uint64_t)0x7FF903F000000000)
 //                                      |   |   |   |   |
 
 // =========
@@ -350,10 +358,10 @@ static const val_t    valnil = {VAL_NIL};
 static inline val_t valnumconst(uint32_t x)  { return ((val_t){ VAL_CONST_0 | x }); }
 
 // This checks if val is any numeric or symbolic const, including valnil, valtrue and valfalse
-#define val_is_any_const(x) (((v).v & VAL_F7_TYPE_MASK) == VAL_CONST_ANY)
+#define val_is_any_const(x) (((v).v & VAL_TYPE_MASK) == VAL_CONST_ANY)
 
 // This checks if val is a numeric const or any of valnil, valtrue and valfalse
-#define val_is_any_NV_const(x) (((v).v & VAL_TYPE_MASK) == VAL_CONST_ANY)
+#define val_is_any_NV_const(x) (((v).v & VAL_CONST_NV_MASK) == VAL_CONST_NV)
 
 // Booleans and valnil
 static inline val_t val_valconst(val_t v) { return val_is_any_const(v) ? v : valnil;}
@@ -383,14 +391,13 @@ static inline int val_isnumconst_2(val_t v, uint32_t x) {
 
 static inline val_t valsymconst(char * restrict sym_str) ;
 
-#define val_is_sym_const(v) (((v).v & VAL_TYPE_MASK) == VAL_SYM_0)
 #define valissymconst(...)  VAL_vrg(val_issymconst_,__VA_ARGS__)
 static inline int val_issymconst_1(val_t v) {
-  return val_is_sym_const(v);
+  return val_is_any_const(v) && (((v).v & VAL_SYM_MASK) != VAL_SYM_NOT);
 }
 
 static inline int val_issymconst_2(val_t v, char * s) {
-  return (val_is_sym_const(v) && (valsymconst(s).v == (v).v));
+  return (val_issymconst_1(v) && (valsymconst(s).v == (v).v));
 }
 
 #define VAL_STR_MAX_LEN 32
@@ -431,7 +438,9 @@ static inline val_t valsymconst(char * restrict sym_str) {
     sym_64 |= (((uint64_t)c) << shift);
   }
 
-  sym_64 |= (VAL_SYM_NULL << shift); // Fill with FF
+  // Fill with FF. This is essential for discriminating the other constant sub-types
+  sym_64 |= (VAL_SYM_NULL << shift); 
+
   sym_val.v = VAL_SYM_0 | (sym_64 & VAL_PAYLOAD_MASK);
   return sym_val;
 }
@@ -446,14 +455,12 @@ static inline valstr_t valsymtostr(val_t v) {
                                     // 0         0         0         0     67  0         0         0  3
     static const char *sym_to_ascii = "!#$*+-./0123456789:<=>?@ABCDEFXYZ[]_abcdefghijklmnopqrstuvwxyz~";
     
-                                     // Ensure there's a terminator
     sym_64 = ((v).v & VAL_PAYLOAD_MASK);
     
     for (int i=0; i<8; i++, s_ptr++) {
       if ((*s_ptr = sym_to_ascii[sym_64 & 0x3F]) == '\0') break;
       sym_64 >>= 6;
     }
-
   }
   *s_ptr = '\0';
   return sym_vstr;
@@ -515,7 +522,7 @@ static inline valstr_t val_tostr_2(val_t v, char *fmt) {
 
   if (fmt && (*fmt == '\0'))
          snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, (v).v);
-  else if (val_is_sym_const(v)) 
+  else if (val_issymconst_1(v)) 
          ret = valsymtostr(v);
   else if (val_is_num_const(v))
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%" PRIX32 ">", (uint32_t)valtoint(v));
@@ -545,7 +552,7 @@ static inline char *val_get_charptr(val_t v, valstr_t *str) {
     char **v_ptr = valtoptr(v);
     ret = v_ptr ? *v_ptr : NULL;
   }
-  else if (val_is_sym_const(v)) {
+  else if (val_issymconst_1(v)) {
     *str = valsymtostr(v);
     ret = str->str;
   }
