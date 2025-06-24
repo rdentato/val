@@ -76,15 +76,13 @@ tstsuite("Val Library syms") {
       tstcheck(valeq(sym,sym2));
       tstcheck(valcmp(sym,sym2) == 0);
 
-      tstcheck(valcmp(sym,"hello") == 0);
-      tstcheck(valcmp("hello",sym) == 0);
-
-      tstcheck(valcmp(sym,"pippo") != 0);
+      tstcheck(valcmp(sym,"hello") != 0);
+      tstcheck(valcmp("hello",sym) != 0);
 
       tstcheck(valisconst(sym,"hello"));
       tstcheck(!valisconst(sym,"pippo"));
 
-      tstcheck(valhash(sym) == valhash("hello"));
+      tstcheck(valhash(sym) != valhash("hello"));
     }
 
     tstcase("toint") {

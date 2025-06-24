@@ -57,7 +57,7 @@
 //           |           7F_       |          FF_        | Tag |     Note                       |
 //           |---------------------|---------------------|-----|--------------------------------|
 //  _F8 1000 |         NAN         |        -NAN         | N/A | Reserved for FPU NAN           |
-//  _F9 1001 |      constants      |      (reserved)     | N/A | Reserved for future exapnsion  |
+//  _F9 1001 |      constants      |      (reserved)     | N/A | FFF9 is kept for extensions    |
 //  _FA 1010 |        void *       |        char *       | NO  | Predefined pointer types       |
 //  _FB 1011 |        FILE *       |     valptr_buf_t    | YES | Predefined pointer types       |
 //  _FC 1100 |      valptr_7_t     |      valptr_6_t     | YES | Library/User defined pointers  |
@@ -78,7 +78,7 @@
 //   7FF9 xxxx Symbolic
 
 //                                      |   |   |   |   |
-#define VAL_NAN_MASK       ((uint64_t)0x7FF0000000000000)
+#define VAL_NAN_MASK       ((uint64_t)0x7FF8000000000000)
 //                                      |   |   |   |   |
 #define VAL_DBLNAN_MASK    ((uint64_t)0x7FFF000000000000)
 #define VAL_DBLNAN_NEG     ((uint64_t)0xFFF8000000000000)
@@ -105,19 +105,16 @@
 #define VAL_CONSTTYPE_MASK ((uint64_t)0xFFFFFFFF00000000)
 #define VAL_CONST_ANY      ((uint64_t)0x7FF9000000000000)
 //                                      |   |   |   |   |
+#define VAL_FALSE          ((uint64_t)0x7FF993F000000000)
+#define VAL_NIL            ((uint64_t)0x7FF9B3F000000000)
 #define VAL_CONST_0        ((uint64_t)0x7FF9C3F000000000)
+#define VAL_CONST_NV_MASK  ((uint64_t)0xFFFF0FFF00000000)
+#define VAL_CONST_NV       ((uint64_t)0x7FF903F000000000)
 //                                      |   |   |   |   |
 #define VAL_SYM_0          ((uint64_t)0x7FF9000000000000)
 #define VAL_SYM_NULL       ((uint64_t)0x7FF9FFFFFFFFFFFF)
 #define VAL_SYM_MASK       ((uint64_t)0x00000FF000000000)
 #define VAL_SYM_NOT        ((uint64_t)0x000003F000000000)
-//                                      |   |   |   |   |
-#define VAL_FALSE          ((uint64_t)0x7FF993F000000000)
-#define VAL_NIL            ((uint64_t)0x7FF9B3F000000000)
-#define VAL_VALCONST_MASK  ((uint64_t)0xFFFFDFF000000000)
-#define VAL_VALCONST       ((uint64_t)0x7FF993F000000000)
-#define VAL_CONST_NV_MASK  ((uint64_t)0xFFFF0FFF00000000)
-#define VAL_CONST_NV       ((uint64_t)0x7FF903F000000000)
 //                                      |   |   |   |   |
 
 // =========
@@ -254,6 +251,10 @@ static inline int val_check_taggable_ptr(val_t v) {
   // Not a pointer
   if (!val_is_any_ptr(v)) return -1; 
 
+  #ifdef VALTAGNOPTR
+    return 0;
+  #endif
+  
   // It's either a char or void pointer can't be tagged
   if (((v).v & VAL_TYPE_MASK) <= VALPTR_CHAR)  return 0;
 
@@ -274,11 +275,10 @@ static inline int val_tagptr_1(val_t v) {
   return ((v).v & VAL_TAG_MASK);
 }
 
-
 // This is used for convenience
 static char *val_emptystr = "\0\0\0"; // FOUR nul bytes
 
-// Convert a C value to a val_t
+// ==== Convert a C value to a val_t
 // Note that these functions return a structure (NOT a pointer).VAL_FALSE
 
 // We only store floating point numbers as doubles since it is guaranteed by the
@@ -339,6 +339,9 @@ static inline val_t val_fromval(val_t v)        {return v;}
 // This improves performance as val_t values pass through val() with no computation.
 #define val(x) _Generic((x), val_t: x, default: val_from(x))
 
+// This checks for val_t values IDENTITY
+#define valeq(x,y) (val(x).v == val(y).v)
+
 
 // ==== CONSTANTS
 
@@ -358,7 +361,7 @@ static const val_t    valnil = {VAL_NIL};
 static inline val_t valnumconst(uint32_t x)  { return ((val_t){ VAL_CONST_0 | x }); }
 
 // This checks if val is any numeric or symbolic const, including valnil, valtrue and valfalse
-#define val_is_any_const(x) (((v).v & VAL_TYPE_MASK) == VAL_CONST_ANY)
+#define val_is_any_const(x) ((x.v & VAL_TYPE_MASK) == VAL_CONST_ANY)
 
 // This checks if val is a numeric const or any of valnil, valtrue and valfalse
 #define val_is_any_NV_const(x) (((v).v & VAL_CONST_NV_MASK) == VAL_CONST_NV)
@@ -372,8 +375,9 @@ static inline val_t val_valconst(val_t v) { return val_is_any_const(v) ? v : val
 static inline int val_isconst_1(val_t v) {return val_is_any_const(v); }
 
 #define val_isconst_2(v,c) _Generic((c), \
+                                    val_t: val_isvalconst_2, \
                                    char *: val_issymconst_2, \
-                                  default: val_isnumconst_2 \
+                                  default: val_isnumconst_2  \
                            ) (valconst(v),c)
 
 // Numeric constants
@@ -389,6 +393,7 @@ static inline int val_isnumconst_2(val_t v, uint32_t x) {
   return val_is_num_const(v) && (((v).v & VAL_32BIT_MASK) == x);
 }
 
+// Symconst
 static inline val_t valsymconst(char * restrict sym_str) ;
 
 #define valissymconst(...)  VAL_vrg(val_issymconst_,__VA_ARGS__)
@@ -397,7 +402,12 @@ static inline int val_issymconst_1(val_t v) {
 }
 
 static inline int val_issymconst_2(val_t v, char * s) {
-  return (val_issymconst_1(v) && (valsymconst(s).v == (v).v));
+  return (val_is_any_const(v) && (valsymconst(s).v == (v).v));
+}
+
+// valconst
+static inline int val_isvalconst_2(val_t v, val_t c) {
+  return val_is_any_const(v) && valeq(v,c);
 }
 
 #define VAL_STR_MAX_LEN 32
@@ -490,9 +500,7 @@ static inline int64_t val_toint(val_t v) {
 }
 
 #define valtounsignedint(v)  ((uint64_t)valtoint(v))
-
-#define valtoint32(x)  ((int32_t)valtoint(x))
-#define valtouint32(x) ((uint32_t)valtoint(x))
+#define valtouint(v) valtounsignedint(v)
 
 #define valtobool(v) val_tobool(val(v))
 static inline  _Bool val_tobool(val_t v)  {
@@ -542,19 +550,14 @@ static inline valstr_t val_tostr_2(val_t v, char *fmt) {
   return ret;
 }
 
-// This checks for val_t values IDENTITY
-#define valeq(x,y) (val(x).v == val(y).v)
 
-static inline char *val_get_charptr(val_t v, valstr_t *str) {
+// Compare 
+static inline char *val_get_charptr(val_t v) {
   char *ret = val_emptystr;
   if (valischarptr(v)) ret = valtoptr(v);
   else if (valisbufptr(v)) {
     char **v_ptr = valtoptr(v);
     ret = v_ptr ? *v_ptr : NULL;
-  }
-  else if (val_issymconst_1(v)) {
-    *str = valsymtostr(v);
-    ret = str->str;
   }
   return ret;
 }
@@ -565,13 +568,11 @@ static inline char *val_get_charptr(val_t v, valstr_t *str) {
 static inline int val_cmp(val_t a, val_t b) {
   char *sa = val_emptystr;
   char *sb = val_emptystr;
-  valstr_t sym_str_a;
-  valstr_t sym_str_b;
 
-  sa = val_get_charptr(a,&sym_str_a);
+  sa = val_get_charptr(a);
   
   if (sa != val_emptystr) {
-    sb = val_get_charptr(b,&sym_str_b);
+    sb = val_get_charptr(b);
 
     if (sb != val_emptystr) {
       if (sa == NULL) sa = val_emptystr; // / To avoid calling strcmp
@@ -598,9 +599,8 @@ static inline uint32_t val_hash(val_t v) {
   uint32_t hash = (uint32_t)0X811C9DC5; // FNV1a INIT
 
   char *s = val_emptystr;
-  valstr_t sym_str;
 
-  s = val_get_charptr(v,&sym_str);
+  s = val_get_charptr(v);
 
   if (s != val_emptystr && s != NULL) {
     // FNV1a abridged from http://www.isthe.com/chongo/tech/comp/fnv/index.html

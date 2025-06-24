@@ -9,11 +9,11 @@
 
 #include "val.h"
 
-typedef enum color_e {COLOR = 0x10000000, RED, GREEN, BLUE } color_t;
-typedef enum direction_e {DIRECTION = 0x20000000, NORTH, SOUTH, EAST, WEST} direction_t;
+typedef enum color_e {COLOR = 0x100, RED, GREEN, BLUE } color_t;
+typedef enum direction_e {DIRECTION = 0x200, NORTH, SOUTH, EAST, WEST} direction_t;
 
-#define iscolor(v)     (valtouint32(v) & COLOR)
-#define isdirection(v) (valtouint32(v) & DIRECTION)
+#define iscolor(v)     (valtoint(v) & COLOR)
+#define isdirection(v) (valtoint(v) & DIRECTION)
 
 tstsuite("Val Library syms") {
     valstr_t num_vstr;
@@ -39,13 +39,20 @@ tstsuite("Val Library syms") {
 
       tstcheck(strcmp(num_vstr.str,"<2D1>") == 0, "str: %s",num_vstr.str);
       tstcheck(strcmp(valtostr(num,"[%d]").str,"[721]") == 0, "str: %s",num_vstr.str);
-
     }
    
     tstcase("Cross some val const") {
       tstcheck(valisconst(valnil));
       tstcheck(valisconst(valtrue));
       tstcheck(valisconst(valfalse));
+
+      tstcheck(!valisnumconst(valnil));
+      tstcheck(!valisnumconst(valtrue));
+      tstcheck(!valisnumconst(valfalse));
+
+      tstcheck(!valissymconst(valnil));
+      tstcheck(!valissymconst(valtrue));
+      tstcheck(!valissymconst(valfalse));
 
       tstcheck(valtoint(valnil) == 0);
       tstcheck(valtoint(valtrue) == 1);
@@ -66,6 +73,16 @@ tstsuite("Val Library syms") {
       tstcheck(valisconst(directions[1]));
       tstcheck(valisconst(directions[2]));
       tstcheck(valisconst(directions[3]));
+
+      tstcheck(valisnumconst(directions[0]));
+      tstcheck(valisnumconst(directions[1]));
+      tstcheck(valisnumconst(directions[2]));
+      tstcheck(valisnumconst(directions[3]));
+
+      tstcheck(!valissymconst(directions[0]));
+      tstcheck(!valissymconst(directions[1]));
+      tstcheck(!valissymconst(directions[2]));
+      tstcheck(!valissymconst(directions[3]));
 
       tstcheck(valisconst(directions[0], NORTH));
       tstcheck(valisconst(directions[1], SOUTH));

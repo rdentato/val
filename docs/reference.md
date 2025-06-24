@@ -594,7 +594,8 @@ int valcmp(val_t a, val_t b);    // Total ordering comparison
   - Negative if `a < b`
   - Zero if `a == b`  
   - Positive if `a > b`
-- **Note**: Symbolic constants and buffers are compared as strings
+- **Note**: Buffers are compared as strings.
+- **Note**: Numeric constants are NOT compared as numbers and symbolic constants are NOT compared as strings.
 
 ### Hashing
 
@@ -604,7 +605,7 @@ int valhash(val_t v);
 
 **Purpose**: Generate 32-bit hash value
 **Returns**: Hash code suitable for hash table implementations
-**Note**: Symbolic constants and buffers are hashed as strings
+**Note**: Buffers are hashed as strings, Symbolic constants are NOT hashed as string.
 
 ---
 ## String Representation
