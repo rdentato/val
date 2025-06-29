@@ -97,6 +97,36 @@ tstsuite("Val Library pointers", advanced) {
         free(point);
     }
 
+    tstcase("Taggability") {
+        val_t p;
+
+        p = valtagptr((void *)NULL,3);
+        tstcheck(valtagptr(p) == 0);
+        p = valtagptr((char *)NULL,3);
+        tstcheck(valtagptr(p) == 0);
+        p = valtagptr((FILE *)NULL,3);
+        tstcheck(valtagptr(p) == 3);
+
+        p = valtagptr((valptr_buf_t)NULL,2); 
+        tstcheck(valtagptr(p) == 2);
+        p = valtagptr((valptr_vec_t)NULL,2); 
+        tstcheck(valtagptr(p) == 2);
+
+        p = valtagptr((valptr_6_t)NULL,1); 
+        tstcheck(valtagptr(p) == 1);
+        p = valtagptr((valptr_5_t)NULL,1); 
+        tstcheck(valtagptr(p) == 1);
+        p = valtagptr((valptr_4_t)NULL,1); 
+        tstcheck(valtagptr(p) == 1);
+        p = valtagptr((valptr_3_t)NULL,1); 
+        tstcheck(valtagptr(p) == 1);
+        p = valtagptr((valptr_2_t)NULL,1); 
+        tstcheck(valtagptr(p) == 1);
+        p = valtagptr((valptr_1_t)NULL,1); 
+        tstcheck(valtagptr(p) == 1);
+        p = valtagptr((valptr_0_t)NULL,1); 
+        tstcheck(valtagptr(p) == 1);
+    }
     // Note that this is outside the C standard as you are not supposed to mix function pointers and object pointers.
     tstcase("function pointers") {
         val_t v_arr[2];

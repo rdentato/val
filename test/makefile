@@ -10,8 +10,11 @@ STATIC=
 endif
 
 DEBUG=-DDEBUG
+
+SRC=../src
+DST=../dist
  
-CFLAGS= $(XFLAGS) -O2 -Wall -I../src -I. $(ARCH) $(STATIC) $(DEBUG)
+CFLAGS= $(XFLAGS) -O2 -Wall -I$(DST) -I. $(ARCH) $(STATIC) $(DEBUG)
 LIBS=-lm
 
 TESTS_SRC=$(wildcard t_*.c)
@@ -21,20 +24,26 @@ TESTS=$(TESTS_SRC:.c=$(_EXE))
 # targets
 all: $(TESTS)
 
-SRCDIR=../src
+include $(SRC)/makefile
 
-runtest: all
+runtest: dist all
 	./tstrun.sh
 
 MAKEFLAGS += --no-builtin-rules
 
-%.o: %.c ../src/val.h
+vallib.o: $(DST)/vallib.c  $(DST)/vallib.h 
+	$(CC) $(CFLAGS) -o vallib.o -c $(DST)/vallib.c
+
+t_vec: t_vec.o vallib.o
+	$(CC) $(ARCH) -s -o t_vec t_vec.o vallib.o $(LIBS) 
+
+%.o: %.c $(SRC)/val.h
 	$(CC) $(CFLAGS) -o $*.o -c $< 
 
 %$(_EXE): %.o 
 	$(CC) $(ARCH) -s -o $* $< $(LIBS)
 
-%.obj: %.c ../src/val.h
+%.obj: %.c $(SRC)/val.h
 	$(CC) $(ARCH) $(CFLAGS) -o $*.obj -c $< 
 
 .PRECIOUS: %.o %.obj
@@ -42,3 +51,4 @@ MAKEFLAGS += --no-builtin-rules
 clean:
 	rm -f $(TESTS_RAW) $(TESTS_RAW:=.exe) $(TESTS_RAW:=.o) $(TESTS_RAW:=.obj) test.log functions.o
 
+cleanall: clean	clean_dist

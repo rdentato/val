@@ -67,8 +67,8 @@ Just a bitwise `AND` and a comparison.
 | **_F8** (`1000`) |    NAN           |    -NAN        | N/A | Reserved for FPU NAN           |
 | **_F9** (`1001`) |   constants      |  (reserved)    | N/A | FFF9 is kept for extensions    |
 | **_FA** (`1010`) |   `void *`       |    `char *`    | NO  | Predefined pointer types       |
-| **_FB** (`1011`) |   `FILE *`       | `valptr_buf_t` | YES | Predefined pointer types       |
-| **_FC** (`1100`) | `valptr_7_t`     |  `valptr_6_t`  | YES | Library/User defined pointers  |
+| **_FB** (`1011`) | `valptr_vec_t`   | `valptr_buf_t` | YES | Predefined pointer types       |
+| **_FC** (`1100`) |   `FILE *`       |  `valptr_6_t`  | YES | Library/User defined pointers  |
 | **_FD** (`1101`) | `valptr_5_t`     |  `valptr_4_t`  | YES | Library/User defined pointers  |
 | **_FE** (`1110`) | `valptr_3_t`     |  `valptr_2_t`  | YES | User defined pointer types     |
 | **_FF** (`1111`) | `valptr_1_t`     |  `valptr_0_t`  | YES | User defined pointer types     |

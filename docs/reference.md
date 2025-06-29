@@ -244,7 +244,7 @@ The valid pointer types are:
 - `VALPTR_CHAR` - char pointer  
 - `VALPTR_FILE` - FILE pointer
 - `VALPTR_BUF` - buffer pointer
-- `VALPTR_0` through `VALPTR_7` - custom pointer types
+- `VALPTR_0` through `VALPTR_6` - custom pointer types
 
 ### Example
 
@@ -345,7 +345,6 @@ int main()
 The types that can be stored in a `val_t` variable, can be extended through these pointer types:
 
 ```c
-typedef struct valptr_7_s *valptr_7_t;
 typedef struct valptr_6_s *valptr_6_t;
 typedef struct valptr_5_s *valptr_5_t;
 typedef struct valptr_4_s *valptr_4_t;
