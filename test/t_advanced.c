@@ -46,25 +46,25 @@ tstsuite("Val Library Advanced Use Cases", advanced) {
         tstcheck(isnan(d));
 
         d_val = val(d);
-        tstnote("0.0/0.0 d: %f d_val: %016" PRIX64,d,d_val.v);
+        tstnote("0.0/0.0 d: %f d_val: %016" PRIX64,d,valraw(d_val));
         tstcheck(valisnumber(d_val));
 
         d_val = val(-d);
-        tstnote("0.0/0.0 -d: %f d_val: %016" PRIX64,-d,d_val.v);
+        tstnote("0.0/0.0 -d: %f d_val: %016" PRIX64,-d,valraw(d_val));
         tstcheck(valisnumber(d_val));
         #endif
 
         d = log(0.0);
         tstcheck(isinf(d));
         d_val = val(d);
-        tstnote("log(0.0) d: %f d_val: %016" PRIX64,d,d_val.v);
+        tstnote("log(0.0) d: %f d_val: %016" PRIX64,d,valraw(d_val));
         tstcheck(valisnumber(d_val));
 
         d_val = val(-d);
         tstcheck(isinf(-d));
         tstcheck(isinf(valtodouble(d_val)));
         tstcheck(valtodouble(d_val) == -d);
-        tstnote("log(0.0) d: %f d_val: %016" PRIX64,-d,d_val.v);
+        tstnote("log(0.0) d: %f d_val: %016" PRIX64,-d,valraw(d_val));
         tstcheck(valisnumber(d_val));
 
         double inf = -log(0.0);
@@ -73,11 +73,11 @@ tstsuite("Val Library Advanced Use Cases", advanced) {
         d = inf - inf;
         tstcheck(isnan(d));
         d_val = val(d);
-        tstnote("inf-inf d: %f d_val: %016" PRIX64,d,d_val.v);
+        tstnote("inf-inf d: %f d_val: %016" PRIX64,d,valraw(d_val));
         tstcheck(valisnumber(d_val));
 
         d_val = val(-d);
-        tstnote("inf-inf -d: %f d_val: %016" PRIX64,-d,d_val.v);
+        tstnote("inf-inf -d: %f d_val: %016" PRIX64,-d,valraw(d_val));
         tstcheck(valisnumber(d_val));
 
     }

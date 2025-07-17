@@ -12,7 +12,7 @@
 
 tstsuite("Val Library valtostr") {
     val_t v = valnil;
-    valstr_t v_str;
+    valtostr_t v_str;
 
     tstcase("Default formatters") {
       v = valconst("Hello");
@@ -30,7 +30,7 @@ tstsuite("Val Library valtostr") {
       tstcheck(strtoull(valtostr(v).str,NULL,16) == (uintptr_t)s);
 
       v = valconst(43);
-      tstcheck(strcmp(valtostr(v).str,"<2B>") == 0,"Got: %s", valtostr(v).str);
+      tstcheck(strcmp(valtostr(v).str,"[2B]") == 0,"Got: %s", valtostr(v).str);
 
       tstcheck(strcmp(valtostr(valnil).str,"nil") == 0,"Got: %s", valtostr(v).str);
       tstcheck(strcmp(valtostr(valtrue).str,"true") == 0,"Got: %s", valtostr(v).str);
@@ -54,5 +54,6 @@ tstsuite("Val Library valtostr") {
       tstnote("valnil: %s",v_str.str);
       tstcheck(strtoull(v_str.str,NULL,16) == valnil.v);
     }
+
 }
 

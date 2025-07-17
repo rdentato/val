@@ -522,7 +522,7 @@ These custom constants are guaranteed to be unique and different from any other 
 There are two types of custom constants:
  - Numeric constants: Defined with a 32-bit integer number. These are primarily for giving unique constant identifiers rather than representing numeric data.
  - Symbolic constants: Defined by a short string (maximum 8 characters). These are useful for creating labels, names, distinct constant values.
-  Symbolic constants can only contain digits (`0`-`9`), lowercase letters (`a-z`), the uppercase hexadecimal digits `A-F`, the upper case letters `XYZ`, and characters from the set: `!#$*+-./:<=>?@[]_`
+  Symbolic constants can only contain digits (`0`-`9`), lowercase letters (`a-z`), and characters from the set: `!#$*+-./:<=>?@[]_`. Upper case letter will be converted into lowercase.
 `
 
 You can create a constant with the `valconst()` function:
@@ -611,14 +611,14 @@ int valhash(val_t v);
   The function `valtostr()` make it easier to print and examone `val_t` values. 
 
 ### String Conversion Type
-The result of conversation is returned in a structure of type `valstr_t`:
+The result of conversation is returned in a structure of type `valtostr_t`:
 
 ```c
-typedef struct { char str[31]; } valstr_t;
+typedef struct { char str[31]; } valtostr_t;
 ```
 
 ```c
-valstr_t valtostr(val_t v [, char* format]);
+valtostr_t valtostr(val_t v [, char* format]);
 ```
 
 **Purpose**: Convert any `val_t` value to its string representation
@@ -626,7 +626,7 @@ valstr_t valtostr(val_t v [, char* format]);
 - `v`: Value to convert
 - `format`: Optional custom format string (max 30 characters)
 
-**Returns**: `valstr_t` object containing string representation
+**Returns**: `valtostr_t` object containing string representation
 
 ### Default Formatters
 Each type is converted using a predefined formatter. You can specify your own using the printf format specifiers.
@@ -652,7 +652,7 @@ printf("%s\n", valtostr(value).str);  // Direct usage
 **Stored Usage**:
 ```c
 val_t value = val(42);
-valstr_t str_obj = valtostr(value);   // Keep object in scope
+valtostr_t str_obj = valtostr(value);   // Keep object in scope
 char *str_ptr = str_obj.str;          // Safe to use while str_obj exists
 printf("%s\n", str_ptr);
 ```
@@ -663,7 +663,7 @@ val_t number = val(7);
 printf("%s\n", valtostr(number, "%03d").str);  // Outputs: "007"
 ```
 
-⚠️ **Warning**: Do not store the `.str` pointer without keeping the `valstr_t` object in scope!
+⚠️ **Warning**: Do not store the `.str` pointer without keeping the `valtostr_t` object in scope!
 
 **Incorrect storage**:
 ```c
@@ -676,7 +676,7 @@ char *bad_ptr = valtostr(value).str;  // bad_ptr becomes invalid immediately aft
 ```c
 // CORRECT - keep the object alive
 val_t value = val(42);
-valstr_t str_obj = valtostr(value);
+valtostr_t str_obj = valtostr(value);
 char *good_ptr = str_obj.str;         // valid while str_obj is in scope
 ```
 

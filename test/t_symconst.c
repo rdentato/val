@@ -11,7 +11,7 @@
 
 
 tstsuite("Val Library syms") {
-    valstr_t sym_vstr;
+    valtostr_t sym_vstr;
     val_t sym = valnil;
 
     tstcase("Check") {
@@ -37,16 +37,25 @@ tstsuite("Val Library syms") {
       tstnote("Hello: %016" PRIX64 "  \"%s\"", sym.v, valtostr(sym).str);
 
       tstcheck(strcmp(sym_vstr.str,"hello") == 0);
+
+      sym = valconst("ABCDEF");
+      sym_vstr = valtostr(sym);
+      tstcheck(strcmp(sym_vstr.str,"abcdef") == 0);
+
+      sym = valconst("XYZ");
+      sym_vstr = valtostr(sym);
+      tstcheck(strcmp(sym_vstr.str,"xyz") == 0);
+
     }
 
     tstcase("Wrong chars") {
       sym = valconst("A,B");
       
-      tstcheck(strcmp( (sym_vstr = valtostr(sym)).str,"A") == 0, "buf: %.8s",sym_vstr.str);
+      tstcheck(strcmp( (sym_vstr = valtostr(sym)).str,"a") == 0, "buf: %.8s",sym_vstr.str);
 
       sym = valconst("A^B");
       sym_vstr = valtostr(sym);
-      tstcheck(strcmp(sym_vstr.str,"A") == 0, "buf: %.8s",sym_vstr.str);
+      tstcheck(strcmp(sym_vstr.str,"a") == 0, "buf: %.8s",sym_vstr.str);
 
       sym = valconst("'AB");
       sym_vstr = valtostr(sym);
@@ -85,7 +94,7 @@ tstsuite("Val Library syms") {
       tstcheck(valhash(sym) != valhash("hello"));
     }
 
-    tstcase("toint") {
+    tstcase("to int") {
       sym = valconst("87654321");
       tstcheck(valtoint(sym) > ((uint64_t)1 << 40));
       tstnote("%016" PRIX64 " sym: '%s'",sym.v,valtostr(sym).str);

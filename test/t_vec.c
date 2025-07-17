@@ -114,4 +114,49 @@ tstsuite("vectors") {
     vct=valfree(vct);
   }
 
+  tstcase("Negative index") {
+    val_t vct = valvec(100);
+
+    for (int k = 0; k<100; k++) 
+      valset(vct,k,1000+k);
+
+    tstcheck(valcount(vct) == 100);
+    tstcheck(valeq(valget(vct,99), 1099) );
+    tstcheck(valeq(valget(vct,-1), 1099) );
+    tstcheck(valeq(valget(vct,-3), 1097) );
+
+    tstcheck(valeq(valget(vct,0), 1000) );
+    tstcheck(valeq(valget(vct,-100), 1000), "Got: %s", valtostr(valget(vct,-99)).str );
+
+    valset(vct,-2,valget(vct,-3));
+    tstcheck(valeq(valget(vct,-2), 1097) );
+    tstcheck(valeq(valget(vct,-2), valget(vct,-3)));
+    tstcheck(valcount(vct) == 100);
+    tstnote("vct[-2]: %s vct[-3]: %s", valtostr(valget(vct,-2)).str, valtostr(valget(vct,-3)).str);
+    valset(vct,-3,4097);
+    tstnote("vct[-2]: %s vct[-3]: %s", valtostr(valget(vct,-2)).str, valtostr(valget(vct,-3)).str);
+    tstcheck(valdel(vct,-2));
+    tstcheck(valcount(vct) == 99);
+    tstcheck(valeq(valget(vct,-2), 4097), "Got: %s",  valtostr(valget(vct,-2)).str );
+
+    vct = valfree(vct);
+  }
+
+  tstcase("Set past the end") {
+    val_t vct = valvec();
+
+    valset(vct,3,1.5);
+    valptr_vec_t p = valtoptr(vct);
+    tstcheck(valeq(p->vec[3],1.5),"v[3] = %s",valtostr(p->vec[3]).str);
+    tstcheck(valeq(p->vec[0],0.0));
+    tstcheck(valisnil(valget(vct,4)));
+    
+    valset(vct,90,3.14);
+    p = valtoptr(vct);
+    tstcheck(valeq(p->vec[90],3.14),"v[3] = %s",valtostr(p->vec[3]).str);
+    tstcheck(valeq(valget(vct,50),0.0));
+    tstcheck(valisnil(valget(vct,91)));
+
+    vct = valfree(vct);
+  }
 }

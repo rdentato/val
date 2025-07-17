@@ -269,10 +269,9 @@ You can pass a string to `valconst()` to create such constant with the following
 
   - No more than 8 characters
   - Only the following characters are permitted:
-     -  any lowercase letters: `a-z`
+     -  any lowercase letters: `a-z` (uppercase letters will be converted to lowercase)
      -  any digit: `0-9`
-     -  few uppercase letters: `A-FX-Z` (any other uppercase letter will be converted to lowercase)
-     -  some special character: `!#$*+-./:<=>?@[]_~`
+     -  some special characters: `!#$*+-./:<=>?@[]_~`
 
 
 ```c
@@ -356,12 +355,12 @@ Note that regardless the type, `valtoint()` returns an 64 bit integer.
 **Answer**: By inspecting the type of the `val_t` value. If no formatting specifier has been passed to valtostr, a default one is chosen, otherwise the specified one is used.
 Note that passing `""` (the empty string) as specified, produce the string representation of the `val_t` value. This may be useful to inspect unexpected behaviours
 
-**Question**: How should the returned `valstr_t` be used?
+**Question**: How should the returned `valtostr_t` be used?
 **Answer**: The value returned by `valtostr()` is a structure containing an array of 32 characters. Being a structure, this is copied back to the caller.
 You have to access the string itself thoroug the field `.str`. The safest way is to assign it to a local variable:
 
 ```c
-   valstr_t ret;
+   valtostr_t ret;
    val_t v = valnil;
    
    ret = valtostr(v,""); // Ask for the internal representation
@@ -371,7 +370,7 @@ You have to access the string itself thoroug the field `.str`. The safest way is
 once the function ends, the variable is discarded and the string is no longer accessible.
 
 **Question**: Could concurrent stringification cause issues?
-**Answer**: No, because no global data is involved, each call has its own `valstr_t` value to work with.
+**Answer**: No, because no global data is involved, each call has its own `valtostr_t` value to work with.
 
 
 ## 10. Comparison & hashing

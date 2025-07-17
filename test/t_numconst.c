@@ -16,7 +16,7 @@ typedef enum direction_e {DIRECTION = 0x200, NORTH, SOUTH, EAST, WEST} direction
 #define isdirection(v) (valtoint(v) & DIRECTION)
 
 tstsuite("Val Library syms") {
-    valstr_t num_vstr;
+    valtostr_t num_vstr;
     val_t num = valnil;
     uint32_t n;
 
@@ -37,7 +37,7 @@ tstsuite("Val Library syms") {
       tstnote("Hello: %016" PRIX64 "  \"%s\"", num.v, num_vstr.str);
       tstnote("Hello: %016" PRIX64 "  \"%s\"", num.v, valtostr(num).str);
 
-      tstcheck(strcmp(num_vstr.str,"<2D1>") == 0, "str: %s",num_vstr.str);
+      tstcheck(strcmp(num_vstr.str,"[2D1]") == 0, "str: %s",num_vstr.str);
       tstcheck(strcmp(valtostr(num,"[%d]").str,"[721]") == 0, "str: %s",num_vstr.str);
     }
    

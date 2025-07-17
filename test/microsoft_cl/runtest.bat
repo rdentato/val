@@ -17,6 +17,8 @@ if /I "%~1"=="clean" (
     del /Q test.log 2>nul
     del /Q t_*.exe  2>nul
     del /Q t_*.obj  2>nul
+    del /Q vallib.obj 2>nul
+    del /Q ..\..\dist\val*
 
     goto :eof
 )
@@ -29,9 +31,21 @@ if /I "%~1"=="clean" (
 echo START %DATE% %TIME% > test.log
 
 :: Compile all t_*.c from parent directory, adding include paths and using C11
-for %%F in ("..\t_*.c") do (
+
+copy ..\..\src\val_lib_pre.h+..\..\src\val.h+..\..\src\val_lib_post.h ..\..\dist\vallib.h
+copy ..\..\src\vallib.c ..\..\dist
+copy ..\..\src\val.h ..\..\dist
+
+cl /W3 /O2 /std:c11 /I ".." /I "..\..\dist" /c /D_CRT_SECURE_NO_WARNINGS ../../src/vallib.c
+
+for /F "delims=" %%F in ('dir /b ..\t_*.c ^| findstr /v /i "^t_vec"') do (
+    echo Compiling ..\%%~nxF...
+    cl /W3 /O2 /std:c11 /I ".." /I "..\..\dist" "..\%%~nxF"
+)
+
+for %%F in ("..\t_vec_*.c") do (
     echo Compiling %%~nxF...
-    cl /W4 /O2 /std:c11 /I ".." /I "..\..\src" "%%~fF"
+    cl /W3 /O2 /std:c11 /I ".." /I "..\..\dist" "%%~fF" vallib.obj
 )
 
 :: Run each compiled t_*.exe and append stderr to test.log

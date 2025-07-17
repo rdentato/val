@@ -3,7 +3,7 @@
 #line 4 "val.h"
 
 #ifndef VAL_VERSION
-#define VAL_VERSION 0x0004009C
+#define VAL_VERSION 0x0004011C
 
 #include <stdio.h>
 #include <stdint.h>
@@ -16,11 +16,13 @@
 #include <stddef.h>
 #include <limits.h>
 
-#ifndef VAL_LIB
-  #define STATIC_INLINE static inline
-  #define VAL_CODE
+#ifdef VAL_LIB
+  #define VAL_STATIC_INLINE
+  #define VAL_STATIC
 #else
-  #define STATIC_INLINE
+  #define VAL_STATIC_INLINE static inline
+  #define VAL_STATIC static
+  #define VAL_CODE
 #endif
 
 
@@ -65,11 +67,11 @@
 //           |           7F_       |          FF_        | Tag |     Note                       |
 //           |---------------------|---------------------|-----|--------------------------------|
 //  _F8 1000 |         NAN         |        -NAN         | N/A | Reserved for FPU NAN           |
-//  _F9 1001 |      constants      |      (reserved)     | N/A | FFF9 is kept for extensions    |
+//  _F9 1001 |      constants      |        pairs        | N/A | Constant (and constant pairs)  |
 //  _FA 1010 |        void *       |        char *       | NO  | Predefined pointer types       |
 //  _FB 1011 |     valptr_vec_t    |     valptr_buf_t    | YES | Predefined pointer types       |
-//  _FC 1100 |        FILE *       |      valptr_6_t     | YES | Library/User defined pointers  |
-//  _FD 1101 |      valptr_5_t     |      valptr_4_t     | YES | Library/User defined pointers  |
+//  _FC 1100 |        FILE *       |      valptr_6_t     | YES | Predefined pointer types       |
+//  _FD 1101 |      valptr_5_t     |      valptr_4_t     | YES | Library defined pointers       |
 //  _FE 1110 |      valptr_3_t     |      valptr_2_t     | YES | User defined pointer types     |
 //  _FF 1111 |      valptr_1_t     |      valptr_0_t     | YES | User defined pointer types     |
 //
@@ -83,6 +85,7 @@
 //   7FF9 93F0 Boolean          1001 0011 1111 0000
 //   7FF9 B3F0 Nil              1011 0011 1111 0000  
 //   7FF9 C3F0 User defined     1100 0011 1111 0000
+//   7FF9 E3F0 Stored  string   1110 0011 1111 0000
 //   7FF9 xxxx Symbolic
 
 //                                      |   |   |   |   |
@@ -124,7 +127,11 @@
 #define VAL_SYM_MASK       ((uint64_t)0x00000FF000000000)
 #define VAL_SYM_NOT        ((uint64_t)0x000003F000000000)
 //                                      |   |   |   |   |
-
+#define VAL_STORED_MASK    ((uint64_t)0xFFFFFFF000000000)
+#define VAL_NSTORE_MASK    ((uint64_t)0x0000000F00000000)
+#define VAL_STORED_0       ((uint64_t)0x7FF9E3F000000000)
+//                                      |   |   |   |   |
+#define VAL_PAIR           ((uint64_t)0xFFF9000000000000)
 // =========
 
 typedef struct {uint64_t v;} val_t;
@@ -200,7 +207,7 @@ typedef struct valptr_1_s *valptr_1_t;
 typedef struct valptr_0_s *valptr_0_t; 
 #endif
 
-#define val_is_any_ptr(v) (((v).v & VAL_F7_TYPE_MASK) >= VALPTR_VOID)
+#define val_is_any_ptr(x) (((x).v & VAL_F7_TYPE_MASK) >= VALPTR_VOID)
 
 #define valisptr(...) VAL_vrg(val_isptr_v,__VA_ARGS__)
 
@@ -222,7 +229,7 @@ static inline int val_isptr_2(val_t v, uint64_t ptr_type)  {
 #define valisvecptr(x)      ((val(x).v & VAL_TYPE_MASK) == VALPTR_VEC)
 
 // The val_t corresponding of the C pointer NULL
-static const val_t valnullptr = {VALPTR_VOID};
+#define valnullptr  ((const val_t){VALPTR_VOID})
 
 #define valptrtype(v) val_ptrtype(val(v))
 static inline uint64_t val_ptrtype(val_t v) {
@@ -271,8 +278,7 @@ static inline int val_check_taggable_ptr(val_t v) {
   return 1;
 }
 
-#define valtagptr_vrg(...) VAL_vrg(val_tagptr_,__VA_ARGS__)
-#define valtagptr(...) valtagptr_vrg(__VA_ARGS__)
+#define valtagptr(...) VAL_vrg(val_tagptr_,__VA_ARGS__)
 
 #define val_tagptr_1(v)   val_tagptr_get(val(v))
 #define val_tagptr_2(v,t) val_tagptr_set(val(v),t)
@@ -288,8 +294,16 @@ static inline int val_tagptr_get(val_t v) {
   return ((v).v & VAL_TAG_MASK);
 }
 
-// This is used for convenience
-static char *val_emptystr = "\0\0\0"; // FOUR nul bytes
+#ifdef VAL_CODE
+VAL_STATIC char *val_emptystr = "\0\0\0"; // FOUR nul bytes
+#endif
+
+#ifdef VAL_LIB
+extern char *val_emptystr;
+#else 
+// This is needed to avoid warnings about unused static variables.
+static inline char *val_usestatic() { return (char *)val_emptystr; }
+#endif
 
 // ==== Convert a C value to a val_t
 // Note that these functions return a structure (NOT a pointer).VAL_FALSE
@@ -356,17 +370,16 @@ static inline val_t val_fromval(val_t v)        {return v;}
 // This checks for val_t values IDENTITY
 #define valeq(x,y) (val(x).v == val(y).v)
 
-
 // ==== CONSTANTS
 
 // Booleans
-static const val_t valfalse = {VAL_FALSE};
-static const val_t valtrue  = {VAL_FALSE | 1};
+#define valfalse ((const val_t){VAL_FALSE})
+#define valtrue  ((const val_t){VAL_FALSE | 1})
 
 #define valisbool(x) ((val(x).v & VAL_CONSTTYPE_MASK) == VAL_FALSE)
 
 // NIL A nil value to signal a void value
-static const val_t    valnil = {VAL_NIL};
+#define valnil ((const val_t){VAL_NIL})
 #define valisnil(x)   ((val(x).v == VAL_NIL))
 
 // User defined constants
@@ -374,16 +387,15 @@ static const val_t    valnil = {VAL_NIL};
 static inline val_t valnumconst(uint32_t x)  { return ((val_t){ VAL_CONST_0 | x }); }
 
 // This checks if val is any numeric or symbolic const, including valnil, valtrue and valfalse
-#define val_is_any_const(x) ((x.v & VAL_TYPE_MASK) == VAL_CONST_ANY)
+#define val_is_any_const(x) (((x).v & VAL_TYPE_MASK) == VAL_CONST_ANY)
 
 // This checks if val is a numeric const or any of valnil, valtrue and valfalse
-#define val_is_any_NV_const(x) (((v).v & VAL_CONST_NV_MASK) == VAL_CONST_NV)
+#define val_is_any_NV_const(x) (((x).v & VAL_CONST_NV_MASK) == VAL_CONST_NV)
 
 // Booleans and valnil
 static inline val_t val_valconst(val_t v) { return val_is_any_const(v) ? v : valnil;}
 
-#define valisconst_vrg(...) VAL_vrg(val_isconst_,__VA_ARGS__)
-#define valisconst(...) valisconst_vrg(__VA_ARGS__)
+#define valisconst(...) VAL_vrg(val_isconst_,__VA_ARGS__)
 
 static inline int val_isconst_1(val_t v) {return val_is_any_const(v); }
 
@@ -395,7 +407,7 @@ static inline int val_isconst_1(val_t v) {return val_is_any_const(v); }
 
 // Numeric constants
 
-#define val_is_num_const(v) (((v).v & VAL_CONSTTYPE_MASK) == VAL_CONST_0)
+#define val_is_num_const(x) (((x).v & VAL_CONSTTYPE_MASK) == VAL_CONST_0)
 
 #define valisnumconst(...) VAL_vrg(val_isnumconst_,__VA_ARGS__)
 static inline int val_isnumconst_1(val_t v) { 
@@ -407,14 +419,15 @@ static inline int val_isnumconst_2(val_t v, uint32_t x) {
 }
 
 // Symconst
-static inline val_t valsymconst(char * restrict sym_str) ;
+VAL_STATIC_INLINE val_t valsymconst(char * restrict sym_str) ;
 
 #define valissymconst(...)  VAL_vrg(val_issymconst_,__VA_ARGS__)
 static inline int val_issymconst_1(val_t v) {
+  // If it is a symconst, than the result would be 0xFF and not 0x3F
   return val_is_any_const(v) && (((v).v & VAL_SYM_MASK) != VAL_SYM_NOT);
 }
 
-static inline int val_issymconst_2(val_t v, char * s) {
+static inline int val_issymconst_2(val_t v, char *s) {
   return (val_is_any_const(v) && (valsymconst(s).v == (v).v));
 }
 
@@ -423,8 +436,26 @@ static inline int val_isvalconst_2(val_t v, val_t c) {
   return val_is_any_const(v) && valeq(v,c);
 }
 
+// stored
+#define valisstored(x) (((x).v & VAL_STORED_MASK) == VAL_STORED_0)
+
+
+// valpairs
+#define valpair(l,r) ((val_t){VAL_PAIR | (((uint64_t)((l) & 0xFFFF)) << 32) | ((r) & VAL_32BIT_MASK)})
+#define valleft(x)   (((x).v & VAL_PAYLOAD_MASK) >> 32)
+#define valright(x)  (((x).v & VAL_32BIT_MASK))
+#define valispair(x) (((x).v & VAL_TYPE_MASK) == VAL_PAIR)
+
+// raw
+
+static inline uint64_t val_raw_v(val_t x) {return x.v;}
+static inline val_t    val_raw_i(uint64_t x) {return (val_t){x};}
+
+#define valraw(x) _Generic((x), val_t: val_raw_v, default: val_raw_i)(x)
+
+// valtostr_t
 #define VAL_STR_MAX_LEN 32
-typedef struct { char str[VAL_STR_MAX_LEN]; } valstr_t;
+typedef struct { char str[VAL_STR_MAX_LEN]; } valtostr_t;
 
 // Syms (8 chars strings)
 
@@ -433,8 +464,12 @@ typedef struct { char str[VAL_STR_MAX_LEN]; } valstr_t;
   //  "!#$*+-./0123456789:<=>?@ABCDEFXYZ[]_abcdefghijklmnopqrstuvwxyz~"
   // Note that character `\0` is mapped to 63 (0x3F)
 
+
+VAL_STATIC_INLINE val_t valsymconst(char * restrict sym_str);
+VAL_STATIC_INLINE valtostr_t valsymtostr(val_t v);
+
 #ifdef VAL_CODE
-STATIC_INLINE val_t valsymconst(char * restrict sym_str) {
+VAL_STATIC_INLINE val_t valsymconst(char * restrict sym_str) {
   val_t sym_val = {0};
 
   static const uint8_t ascii_to_sym[128] = {
@@ -442,8 +477,8 @@ STATIC_INLINE val_t valsymconst(char * restrict sym_str) {
     0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
     0x3F, 0x00, 0x3F, 0x01, 0x02, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x03, 0x04, 0x3F, 0x05, 0x06, 0x07,
     0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x3F, 0x13, 0x14, 0x15, 0x16,
-    0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32,
-    0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x1E, 0x1F, 0x20, 0x21, 0x3F, 0x22, 0x3F, 0x23,
+    0x17, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32,
+    0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x22, 0x3F, 0x23,
     0x3F, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32,
     0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3F, 0x3F, 0x3F, 0x3E, 0x3F
   };
@@ -469,13 +504,12 @@ STATIC_INLINE val_t valsymconst(char * restrict sym_str) {
   return sym_val;
 }
 
-
-STATIC_INLINE valstr_t valsymtostr(val_t v) {
-  valstr_t sym_vstr;
+VAL_STATIC_INLINE valtostr_t valsymtostr(val_t v) {
+  valtostr_t sym_vstr;
   uint64_t sym_64;
   char *s_ptr = sym_vstr.str;
 
-  if ((((v).v & VAL_TYPE_MASK) == VAL_SYM_0)) {
+  if (((v.v & VAL_TYPE_MASK) == VAL_SYM_0)) {
                                     //           1         2         3     33  4         5         6  6
                                     // 0         0         0         0     67  0         0         0  3
     static const char *sym_to_ascii = "!#$*+-./0123456789:<=>?@ABCDEFXYZ[]_abcdefghijklmnopqrstuvwxyz~";
@@ -491,10 +525,6 @@ STATIC_INLINE valstr_t valsymtostr(val_t v) {
   return sym_vstr;
 }
 #endif
-
-STATIC_INLINE val_t valsymconst(char * restrict sym_str);
-STATIC_INLINE valstr_t valsymtostr(val_t v);
-
 
 // ====== Retrieve values from a val_t variable
 #define valtodouble(v) val_todouble(val(v))
@@ -532,37 +562,37 @@ static inline  _Bool val_tobool(val_t v)  {
 static inline   void *val_toptr(val_t v) {
   int taggable = val_check_taggable_ptr(v);
 
-  if (taggable >= 0) { 
-    uint64_t ret_64 = (v).v & VAL_PAYLOAD_MASK;
+  if (taggable < 0) { errno = EINVAL; return NULL; }
 
-    if (taggable) ret_64 &= ~VAL_TAG_MASK; // Need to eliminate the tag!
-    return (void*)(uintptr_t)ret_64;
-  }
-
-  errno = EINVAL; 
-  return NULL; 
+  errno = 0;
+  uint64_t ret_64 = (v).v & VAL_PAYLOAD_MASK;
+  if (taggable) ret_64 &= ~VAL_TAG_MASK; // Need to eliminate the tag!
+  return (void*)(uintptr_t)ret_64;
 }
 
 #define valtostr(...) VAL_vrg(val_tostr_,__VA_ARGS__)
 #define val_tostr_1(v) val_tostr_2(v,NULL)
-STATIC_INLINE valstr_t val_tostr_2(val_t v, char *fmt);
+
+VAL_STATIC_INLINE valtostr_t val_tostr_2(val_t v, char *fmt);
 
 #ifdef VAL_CODE
-STATIC_INLINE valstr_t val_tostr_2(val_t v, char *fmt) {
-  valstr_t ret;
+VAL_STATIC_INLINE valtostr_t val_tostr_2(val_t v, char *fmt) {
+  valtostr_t ret;
 
   if (fmt && (*fmt == '\0'))
          snprintf(ret.str, VAL_STR_MAX_LEN, "%016" PRIX64, (v).v);
   else if (val_issymconst_1(v)) 
          ret = valsymtostr(v);
+  else if (valispair(v))
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%" PRIX16 ",%" PRIX32 ">", (uint16_t)valleft(v),(uint32_t)valright(v));
   else if (val_is_num_const(v))
-         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%" PRIX32 ">", (uint32_t)valtoint(v));
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "[%" PRIX32 "]", (uint32_t)valtoint(v));
   else if (val_is_any_ptr(v))
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%p", valtoptr(v));
   else if (valisbool(v))
-         strcpy(ret.str,((v).v & 1)? "true" : "false");
+         strncpy(ret.str,((v).v & 1)? "true" : "false",VAL_STR_MAX_LEN);
   else if (valisnil(v))
-         strcpy(ret.str,"nil");
+         strncpy(ret.str,"nil",VAL_STR_MAX_LEN);
   else if (valisint(v))
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%" PRId64, valtoint(v));
   else if (valisnumber(v)) 
@@ -576,11 +606,11 @@ STATIC_INLINE valstr_t val_tostr_2(val_t v, char *fmt) {
 
 // Compare & Hash
 
-#define valcmp(a,b) val_cmp(val(a),val(b))
-STATIC_INLINE int val_cmp(val_t a, val_t b);
+#define valcmp(a,b) val_cmp(val(a),val(b),NULL)
+VAL_STATIC_INLINE int val_cmp(val_t a, val_t b, void *);
 
 #define valhash(a) val_hash(val(a))
-STATIC_INLINE uint32_t val_hash(val_t v);
+VAL_STATIC_INLINE uint32_t val_hash(val_t v);
 
 #ifdef VAL_CODE
 static inline char *val_get_charptr(val_t v) {
@@ -593,11 +623,16 @@ static inline char *val_get_charptr(val_t v) {
   return ret;
 }
 
-// This compares two val_t values. Like the hash function below, it is provide just for convenience 
+// This compares two val_t values. Like the hash function below, it is provided just for convenience 
 // since your criteria for comparison and hashing might be different.
-STATIC_INLINE int val_cmp(val_t a, val_t b) {
+VAL_STATIC_INLINE int val_cmp(val_t a, val_t b, void *aux) {
   char *sa = val_emptystr;
   char *sb = val_emptystr;
+
+  if (valispair(a) && valispair(b)) {
+    if (a.v >> 32 == (b.v >> 32)) return 0;
+    return (a.v > b.v)? 1 : -1 ;
+  }
 
   sa = val_get_charptr(a);
   
@@ -624,7 +659,7 @@ STATIC_INLINE int val_cmp(val_t a, val_t b) {
   return (a.v > b.v)? 1 : (a.v < b.v) ? -1 : 0 ;
 }
 
-STATIC_INLINE uint32_t val_hash(val_t v) {
+VAL_STATIC_INLINE uint32_t val_hash(val_t v) {
   uint32_t hash = (uint32_t)0X811C9DC5; // FNV1a INIT
 
   char *s = val_emptystr;
@@ -653,9 +688,5 @@ STATIC_INLINE uint32_t val_hash(val_t v) {
 }
 #endif // VAL_CODE
 
-// This is needed to avoid warnings about unused static variables.
-static inline uint64_t val_usestatic()
-{
-  return (valnil.v | valtrue.v | valfalse.v | valnullptr.v | (uintptr_t)val_emptystr);
-}
+
 #endif // VAL_VERSION
