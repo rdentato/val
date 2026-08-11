@@ -213,7 +213,13 @@ static inline int val_isint(val_t v) {
 
 // ==== POINTERS
 
-// Buffers are structures whose first field is a char *
+// Buffers are growable text buffers managed by the library (vallib): the
+// library defines valptr_buf_s, allocates/grows the storage, keeps it
+// NUL-terminated, and frees it with valfree(). The first field is a char *
+// pointing to the NUL-terminated string used for comparisons/hashing.
+// In header-only mode (val.h without vallib) the library cannot manage
+// buffers: a user-defined struct whose first field is a char * is still
+// recognized and treated as a string, but growth is the user's job.
 typedef struct valptr_buf_s *valptr_buf_t; 
 
 // Vectors are dynamic arrays of val_t

@@ -52,6 +52,8 @@ To better understand how to use this data structure, refer to the diagaram below
 #define VAL_CODE
 #include "vallib.h"
 
+#include <stdarg.h>
+
 #ifdef VALNOTHREAD
 #define VAL_THREAD_LOCAL
 #endif
@@ -159,6 +161,14 @@ val_t valfree(val_t a)
     vec_ptr->fst = 0;
     vec_ptr->sze = 0;
     free(vec_ptr);
+  }
+  else if (valisbufptr(a)) {
+    valptr_buf_t buf_ptr = valtoptr(a);
+    if (buf_ptr->text != NULL) free(buf_ptr->text);
+    buf_ptr->text = NULL;
+    buf_ptr->len  = 0;
+    buf_ptr->sze  = 0;
+    free(buf_ptr);
   }
   else errno = EINVAL;
 
@@ -547,9 +557,217 @@ int32_t val_bsearch(val_t a, val_t key, val_cmp_t cmp, val_t aux)
   return elm? (elm-base) : -1;
 }
 
+// ==== BUFFERS
+// Growable NUL-terminated text buffers (see valptr_buf_s in val_lib_post.h).
+// All functions return 0 (or valnullptr for valbufnew) on error with errno
+// set (EINVAL/ENOMEM/ERANGE).
+
+static int make_room_buf(valptr_buf_t b, int32_t need)
+{
+  if (b == NULL) {errno = EINVAL; return 0;}
+
+  if (need < 0) {errno = ERANGE; return 0;}  // Overflow guard
+
+  if (need <= b->sze) {errno = 0; return 1;} // Enough room
+
+  int32_t new_size = b->sze;
+  if (new_size == 0) new_size = 16;
+  while (new_size < need) new_size = mul_phi(new_size);
+
+  char *new_text = realloc(b->text, new_size);
+  if (new_text == NULL) {errno = ENOMEM; return 0;}
+  b->text = new_text;
+  b->sze = new_size;
+  errno = 0;
+  return 1;
+}
+
+val_t valbufnew(int32_t size)
+{
+  valptr_buf_t b = malloc(sizeof(struct valptr_buf_s));
+  if (b == NULL) {errno = ENOMEM; return valnullptr;}
+
+  b->text = NULL;
+  b->sze = 0;
+  b->len = 0;
+
+  if ((0 < size) && !make_room_buf(b, size)) {
+    free(b);
+    return valnullptr;
+  }
+  if (b->text != NULL) b->text[0] = '\0'; // Keep it a valid empty string
+
+  return val(b);
+}
+
+int valbufcpy(val_t a, const char *s)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+  if (s == NULL) {errno = EINVAL; return 0;}
+
+  int32_t len = (int32_t)strlen(s);
+  if (!make_room_buf(b, len+1)) return 0;
+
+  memcpy(b->text, s, len+1);
+  b->len = len;
+  errno = 0;
+  return 1;
+}
+
+int valbufcat(val_t a, const char *s)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+  if (s == NULL) {errno = EINVAL; return 0;}
+
+  int32_t len = (int32_t)strlen(s);
+  if (!make_room_buf(b, b->len + len + 1)) return 0;
+
+  memcpy(b->text + b->len, s, len+1);
+  b->len += len;
+  errno = 0;
+  return 1;
+}
+
+int valbufadd(val_t a, const char *s, int32_t len)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+  if ((s == NULL) || (len < 0)) {errno = EINVAL; return 0;}
+
+  if (!make_room_buf(b, b->len + len + 1)) return 0;
+
+  memcpy(b->text + b->len, s, len);
+  b->len += len;
+  b->text[b->len] = '\0'; // Always NUL-terminate
+  errno = 0;
+  return 1;
+}
+
+int valbuffmt(val_t a, const char *fmt, ...)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+  if (fmt == NULL) {errno = EINVAL; return 0;}
+
+  va_list ap;
+  va_start(ap, fmt);
+  int need = vsnprintf(NULL, 0, fmt, ap);
+  va_end(ap);
+  if (need < 0) {errno = EINVAL; return 0;}
+
+  if (!make_room_buf(b, need+1)) return 0;
+
+  va_start(ap, fmt);
+  vsnprintf(b->text, (size_t)(need+1), fmt, ap);
+  va_end(ap);
+  b->len = need;
+  errno = 0;
+  return 1;
+}
+
+int valbufcatf(val_t a, const char *fmt, ...)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+  if (fmt == NULL) {errno = EINVAL; return 0;}
+
+  va_list ap;
+  va_start(ap, fmt);
+  int need = vsnprintf(NULL, 0, fmt, ap);
+  va_end(ap);
+  if (need < 0) {errno = EINVAL; return 0;}
+
+  if (!make_room_buf(b, b->len + need + 1)) return 0;
+
+  va_start(ap, fmt);
+  vsnprintf(b->text + b->len, (size_t)(need+1), fmt, ap);
+  va_end(ap);
+  b->len += need;
+  errno = 0;
+  return 1;
+}
+
+int valbufins(val_t a, int32_t ndx, const char *s)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+  if (s == NULL) {errno = EINVAL; return 0;}
+
+  if (ndx < 0) ndx = b->len + ndx;      // Negative: count from the end
+  if ((ndx < 0) || (ndx > b->len)) {errno = ERANGE; return 0;}
+
+  int32_t len = (int32_t)strlen(s);
+  if (!make_room_buf(b, b->len + len + 1)) return 0;
+
+  memmove(b->text + ndx + len, b->text + ndx, (size_t)(b->len - ndx + 1));
+  memcpy (b->text + ndx, s, (size_t)len);
+  b->len += len;
+  errno = 0;
+  return 1;
+}
+
+int valbufdel(val_t a, int32_t from, int32_t to)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+
+  if (from < 0) from = b->len + from;   // Negative: count from the end
+  if (to   < 0) to   = b->len + to;
+  if ((from < 0) || (from > to) || (from >= b->len)) {errno = ERANGE; return 0;}
+  if (to >= b->len) to = b->len - 1;
+
+  memmove(b->text + from, b->text + to + 1, (size_t)(b->len - to));
+  b->len -= (to - from) + 1;
+  b->text[b->len] = '\0'; // Keep it NUL-terminated
+  errno = 0;
+  return 1;
+}
+
+int valbufclear(val_t a)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+
+  b->len = 0;
+  if (b->text != NULL) b->text[0] = '\0';
+  errno = 0;
+  return 1;
+}
+
+int valbufreserve(val_t a, int32_t extra)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return 0;
+  if (extra < 0) {errno = ERANGE; return 0;}
+
+  return make_room_buf(b, b->len + extra + 1);
+}
+
+int32_t valbuflen(val_t a)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return -1;
+  return b->len;
+}
+
+int32_t valbufsze(val_t a)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return -1;
+  return b->sze;
+}
+
+char *valbuftxt(val_t a)
+{
+  valptr_buf_t b = val_bufptr(a);
+  if (b == NULL) return NULL;
+  return b->text; // May be NULL if no room has been allocated yet
+}
+
 // store
 val_store_t val_stores[VAL_NUM_STORES] = { 0 };
-
 val_t val_store(const char *str)
 {
   int nstore = 0;

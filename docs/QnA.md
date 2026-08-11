@@ -206,42 +206,42 @@ You have to use `#define xxx valptr_X_t`, you can't directly define the type `va
 ```
 >`ptrtoint_1` and `ptrtoint_2` are the SAME type (a pointer to an `int`) and they are treated accordingly. If you try to assign them to two different `valptr_X_t`, you will get an error.
 
-**Question**: What constraints apply to user-defined buffer structs  and what happens if a user’s struct doesn’t meet those constraints?
-**Answer**: A growable text buffer is a very common structure in C programs, that's why `val` supports it natively.
-The assumption is that the first field of the structure is the pointer to the memory holding a `\0`-terminated string:
+**Question**: How are growable text buffers managed?
+**Answer**: Growable text buffers are managed by the library (when using `vallib`).
+The library defines `struct valptr_buf_s` and provides the API to create, modify and free buffers
+(`valbufnew()`, `valbufcpy()`, `valbufcat()`, `valbufadd()`, `valbuffmt()`, `valbufcatf()`, `valbufins()`,
+`valbufdel()`, `valbufclear()`, `valbufreserve()`, `valbuflen()`, `valbufsze()`, `valbuftxt()`, `valfree()`):
 
 ```c
-  typedef struct val_buf_s {
-    char *txt;       // This must be the first field
-    int   len;       // All other fields are ignored.
-    int   maxlen;    //
-    uint32_t flags;  //
-    // Any other fields you may need for your buffer
-  } *buf_t;
-
-  #include "val.h"
+  #include "vallib.h"
 
   int main()
   {
     val_t a_string;
     val_t a_buffer;
 
-    buf_t buffer = bufnew();
+    a_buffer = valbufnew(0);
 
     a_string = val("Hello!!");
-    a_buffer = val(buffer);
-
-    bufcpy(buffer,"Hello!!");
+    valbufcpy(a_buffer, "Hello!!");
 
     if (valcmp(a_string,a_buffer) == 0)
       printf("They are equal!!\n");
+
+    valfree(a_buffer);
   }
 
 ```
-If a struct doesn’t follow this layout, `valptr_buf_s` operations will lead to out-of-bounds reads.
+The library guarantees that the buffer content is always a `\0`-terminated string, so `valcmp()` and `valhash()`
+can treat it as a string without any user code.
+
+**Note**: The library owns the buffer struct: when using `vallib` do **not** define `struct valptr_buf_s` yourself.
+In header-only mode (just `val.h`, without `vallib`) the library cannot manage buffers: you may define your own
+buffer struct whose **first field is a `char *`** holding a `\0`-terminated string so that `valcmp()`/`valhash()`
+treat it as a string, but allocation and growth are your responsibility.
 
 **Question**: How are `valptr_buf_t` buffers treated for hashing and comparison,
-**Answer**: They are treated as strings. That's why it is important that the first field is a `char *`;
+**Answer**: They are treated as strings, by their content.
 
 ## 6. Constants encoding
 

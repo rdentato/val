@@ -29,6 +29,7 @@ A comprehensive C library for NaN boxing and pointer tagging that efficiently st
   - [Booleans](#booleans)
     - [Example](#example-2)
   - [Nil Values](#nil-values)
+    - [Nil-family constants](#nil-family-constants)
     - [Example](#example-3)
   - [Constants](#constants)
     - [Example](#example-4)
@@ -42,6 +43,8 @@ A comprehensive C library for NaN boxing and pointer tagging that efficiently st
   - [Pairs](#pairs)
     - [Example](#example-5)
   - [Stored Strings](#stored-strings)
+    - [Deleting stored strings](#deleting-stored-strings)
+    - [Inspecting the arena](#inspecting-the-arena)
     - [Example](#example-6)
   - [Data Structures](#data-structures)
     - [Vectors](#vectors)
@@ -238,7 +241,7 @@ int valisptr(val_t v [, uint64_t type]);
 
 **`valisbufptr(val_t v)`**
 - **Purpose**: Check if value is a boxed buffer pointer
-- **Returns**: Non-zero if `v` contains a `valptr_buf_s*`, zero otherwise
+- **Returns**: Non-zero if `v` contains a `valptr_buf_s*` (a library-managed buffer when using `vallib`), zero otherwise
 
 **`valisnullptr(val_t v)`**
 - **Purpose**: Check if value is a NULL pointer of any type
@@ -323,35 +326,41 @@ val_t valtagptr(val_t v, int tag);
 
 ### Buffer Pointers
 
-Growable **text buffer** is a common data structure and the library provides direct support for it. For the purpose of hashing or comparing, they are considered strings exactly as a `char *`. It is important to ensure that the first field is a `char *` containing a zero terminated string.
-For example:
+Growable **text buffers** are managed by the library (when using `vallib`).
+The library defines `struct valptr_buf_s`, allocates and grows the underlying
+storage, keeps it NUL-terminated, and frees it with `valfree()`.
+For the purpose of hashing or comparing, buffers are considered strings exactly
+as a `char *`.
 
 ```c
-// Complete the definition of valptr_buf_s for your buffer structure
-typedef struct valptr_buf_s {
-    char *text;    // MUST BE THE FIRST FIELD
-    int  size;     // Buffer capacity
-    int  curlen;   // Current used length
-} *buf_t;
-
-buf_t bufnew(int size);         // Create a new buffer with an initial size
-void  buffree(buf_t b);         // Free up a buffer
-int   bufcpy(buf_t b, char *s); // copy a string in the buffer
+#include "vallib.h"
 
 int main()
 {
-  val_t vb = val(bufnew(100));
+  val_t vb = valbufnew(100);          // Create a buffer (0 = lazy allocation)
 
-  if (valisbufferptr(vb)) {
-     bufcpy(valtoptr(vb),"Hello!");
-     printf("Buffer: %p\n", valtoptr(vb));
-     printf("Text: %s\n", valtoptr(vb)->text);
-     printf("Is greeting?: %d\n", valcmp(vb,"Hello!")); // Direct comparison as string
-  }
+  valbufcpy(vb, "Hello!");            // Set content
+  valbufcat(vb, " World");            // Append
+  valbuffmt(vb, "%s %d", "pi", 3);   // Overwrite with formatted text
+  printf("Text: %s\n", valbuftxt(vb));
+  printf("len: %d\n", valbuflen(vb));
+  printf("Is greeting?: %d\n", valcmp(vb, "Hello! pi 3")); // String comparison
+
+  valfree(vb);                        // The library frees the buffer
 }
-
 ```
- **Note**: For a structure to be correctly recognized and handled as a buffer by the `val` library, its `char *` field **MUST BE THE FIRST FIELD** in the structure definition. This is critical for the library's internal mechanisms to correctly extract the text pointer of the buffer.
+
+The buffer API is: `valbufnew()`, `valbufcpy()`, `valbufcat()`, `valbufadd()`,
+`valbuffmt()`, `valbufcatf()`, `valbufins()`, `valbufdel()`, `valbufclear()`,
+`valbufreserve()`, `valbuflen()`, `valbufsze()` and `valbuftxt()`.
+
+**Note**: When using `vallib` the library owns the buffer struct: do **not**
+define `struct valptr_buf_s` yourself (it would conflict with the library's
+definition). In header-only mode (including just `val.h`, without `vallib`)
+the library cannot manage buffers: you may still define your own buffer struct
+whose **first field is a `char *`** holding a NUL-terminated string, so that
+`valcmp()`/`valhash()` treat it as a string, but allocation and growth are then
+your responsibility.
 
 ### Custom Pointer Types
 

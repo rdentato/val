@@ -21,6 +21,12 @@ struct valptr_vec_s {
   uint8_t *dead;  // Per-entry deleted flags (maps only)
 };
 
+struct valptr_buf_s {
+  char   *text;  // MUST remain first — NUL-terminated string
+  int32_t sze;   // Capacity (bytes allocated)
+  int32_t len;   // Used length
+};
+
 val_t valaux();
 
 #define VAL_VEC_EMPTY 0x0000
@@ -49,6 +55,14 @@ static inline valptr_vec_t val_vecptr(val_t a)
   errno = 0;
   if (!valisvecptr(a) || ((vec_ptr = valtoptr(a)) == NULL) ) errno = EINVAL; 
   return vec_ptr;
+}
+
+static inline valptr_buf_t val_bufptr(val_t a)
+{
+  valptr_buf_t buf_ptr = NULL;
+  errno = 0;
+  if (!valisbufptr(a) || ((buf_ptr = valtoptr(a)) == NULL) ) errno = EINVAL; 
+  return buf_ptr;
 }
 
 static inline val_t *valvecbase(val_t a) {
@@ -182,6 +196,26 @@ int val_sort(val_t a, val_cmp_t cmp, val_t aux);
 #define val_bsearch_3(a,e,c)   val_bsearch(a,val(e),c,valnil)
 #define val_bsearch_4(a,e,c,x) val_bsearch(a,val(e),c,x)
 int32_t val_bsearch(val_t a, val_t e, val_cmp_t cmp, val_t aux);
+
+// BUFFERS
+// Growable NUL-terminated text buffers. A buffer is boxed as VALPTR_BUF and
+// behaves as a string in valcmp() and valhash().
+// All functions return 0 (or valnullptr for valbufnew) on error with errno
+// set (EINVAL/ENOMEM/ERANGE).
+
+val_t  valbufnew(int32_t size);              // Create a buffer with initial capacity (0 = lazy)
+int    valbufcpy(val_t a, const char *s);    // Replace content with s
+int    valbufcat(val_t a, const char *s);    // Append s
+int    valbufadd(val_t a, const char *s, int32_t len); // Append len bytes (NUL-terminated)
+int    valbuffmt(val_t a, const char *fmt, ...);       // Overwrite with formatted text
+int    valbufcatf(val_t a, const char *fmt, ...);      // Append formatted text
+int    valbufins(val_t a, int32_t ndx, const char *s); // Insert s at position ndx
+int    valbufdel(val_t a, int32_t from, int32_t to);   // Remove range [from,to] (negative = from end)
+int    valbufclear(val_t a);                // Reset length to 0, keep capacity
+int    valbufreserve(val_t a, int32_t extra); // Ensure room for extra more bytes
+int32_t valbuflen(val_t a);                 // Current content length (-1 on error)
+int32_t valbufsze(val_t a);                 // Capacity (-1 on error)
+char  *valbuftxt(val_t a);                  // NUL-terminated text pointer
 
 #endif // VAL_LIB
 

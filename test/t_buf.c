@@ -9,6 +9,10 @@
 
 #include "val.h"
 
+// Header-only mode (val.h without vallib): the library cannot manage buffers,
+// so this test defines its own valptr_buf_s (first field a char *) and does
+// its own allocation/growth. With vallib, buffers are library-managed
+// (see t_vebuf.c).
 typedef struct valptr_buf_s { char *buf; int len; int size; } *buf_t;
 
 buf_t bufnew(int size) 
