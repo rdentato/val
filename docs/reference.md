@@ -39,6 +39,17 @@ A comprehensive C library for NaN boxing and pointer tagging that efficiently st
     - [String Conversion Type](#string-conversion-type)
     - [Default Formatters](#default-formatters)
     - [Examples](#examples)
+  - [Pairs](#pairs)
+    - [Example](#example-5)
+  - [Stored Strings](#stored-strings)
+    - [Example](#example-6)
+  - [Data Structures](#data-structures)
+    - [Vectors](#vectors)
+    - [Stacks](#stacks)
+    - [Queues](#queues)
+    - [Maps](#maps)
+    - [Sorting and Searching](#sorting-and-searching)
+    - [Example](#example-7)
   - [Performance Considerations](#performance-considerations)
     - [Optimization Features](#optimization-features)
   - [Examples](#examples-1)
@@ -93,9 +104,11 @@ The fundamental data type that can hold any of the supported value types in NaN-
 - **52-bit signed integers** 
 - **Pointers** (`void*`, `char*`, `FILE*`, custom struct pointers)
 - **Booleans** (`valtrue`, `valfalse`)
-- **Nil** (`valnil`)
+- **Nil** (`valnil`) and the nil-family constants (`valnone`, `valundefined`, `valtombstone`, `valdeleted`)
 - **Numeric constants** (32-bit integers)
 - **Symbolic constants** (up to 8-character strings)
+- **Pairs** (a 16-bit and a 32-bit value in one word)
+- **Stored strings** (library-owned strings, see [Stored Strings](#stored-strings))
 
 ---
 
@@ -492,6 +505,30 @@ int valisnil(val_t v);
 **Purpose**: Check if value represents nil
 **Returns**: Non-zero if `v` is `valnil`, zero otherwise
 
+### Nil-family constants
+
+Besides `valnil`, the library defines four sibling constants for the classic
+"sentinel" values used by data structures:
+
+```c
+valnil        // "no value at all"
+valnone       // "no result / nothing"
+valundefined  // "value not (yet) defined"
+valtombstone  // "slot freed / deleted"
+valdeleted    // "entry deleted"
+```
+
+All five are distinct `val_t` values (different bit patterns), so they can be
+used as unambiguous sentinels, map markers, or internal flags. Only `valnil`
+satisfies `valisnil()`; the others are regular constants (see
+[Constants](#constants)):
+
+```c
+valisnil(valnil)        // true
+valisnil(valnone)       // false
+valisconst(valdeleted)  // true
+```
+
 ### Example
 
 ```c
@@ -594,6 +631,8 @@ int valcmp(val_t a, val_t b);    // Total ordering comparison
   - Zero if `a == b`  
   - Positive if `a > b`
 - **Note**: Buffers are compared as strings.
+- **Note**: Stored strings are compared as strings, by content (so a stored string and a `char*` with the same text compare equal).
+- **Note**: Pairs compare lexicographically, first by their left component then by the right one.
 - **Note**: Numeric constants are NOT compared as numbers and symbolic constants are NOT compared as strings.
 
 ### Hashing
@@ -605,6 +644,7 @@ int valhash(val_t v);
 **Purpose**: Generate 32-bit hash value
 **Returns**: Hash code suitable for hash table implementations
 **Note**: Buffers are hashed as strings, Symbolic constants are NOT hashed as string.
+**Note**: Stored strings are hashed as strings, by content (same hash as a `char*` with the same text).
 
 ---
 ## String Representation
@@ -614,7 +654,7 @@ int valhash(val_t v);
 The result of conversation is returned in a structure of type `valtostr_t`:
 
 ```c
-typedef struct { char str[31]; } valtostr_t;
+typedef struct { char str[32]; } valtostr_t;
 ```
 
 ```c
@@ -639,7 +679,14 @@ Each type is converted using a predefined formatter. You can specify your own us
 | boolean | "`false`"/"`true`" |
 | nil | "`nil`" |
 | symbolic constant | string |
-| numeric constant | `<%" PRIX32 ">` |
+| numeric constant | `[%" PRIX32 "]` |
+| pair | `<%" PRIX16 ",%" PRIX32 ">` |
+| stored string | the string content |
+
+Stored strings print their content (truncated to fit the 32-character buffer);
+pairs print as `<L,R>` in hexadecimal. The `valtoint()` conversion on a stored
+string parses the content with `strtoll` (base 10), returning `0` for
+a non-numeric content.
 
 ### Examples
 
@@ -678,6 +725,237 @@ char *bad_ptr = valtostr(value).str;  // bad_ptr becomes invalid immediately aft
 val_t value = val(42);
 valtostr_t str_obj = valtostr(value);
 char *good_ptr = str_obj.str;         // valid while str_obj is in scope
+```
+
+---
+
+## Pairs
+
+A pair is a `val_t` value that packs two integers into the payload bits of a
+single NaN-boxed word:
+
+```c
+val_t valpair(l, r);   // Create the pair <l,r>
+int   valispair(x);    // Check if x is a pair
+int64_t valleft(x);    // The left component (16 bits)
+int64_t valright(x);   // The right component (32 bits)
+```
+
+**Purpose**: Compact storage of two small integers (for example a 16-bit
+index and a 32-bit value) in one `val_t`.
+
+- `l` is masked to 16 bits and `r` to 32 bits; larger values are truncated.
+- Pairs are compared by `valcmp()` lexicographically: first the left
+  component, then the right one, and consistently with `valeq()` (two pairs
+  are equal iff both components are equal).
+- `valtostr()` prints a pair as `<L,R>` in hexadecimal, or with a custom
+  `printf` format: `valtostr(p, "<%PRIu16,%PRIu32>")`.
+
+### Example
+
+```c
+#include "val.h"
+#include <stdio.h>
+
+int main(void) {
+    val_t p = valpair(0xA1A2, 0xB1B2B3B4);
+
+    printf("pair: %s\n", valtostr(p).str);        // <A1A2,B1B2B3B4>
+    printf("left: %d right: %u\n",
+           (int)valleft(p), (unsigned)valright(p));
+
+    val_t q = valpair(0xA1A2, 0x0);
+    printf("cmp: %d\n", valcmp(p, q));            // > 0 (same left, right differs)
+    return 0;
+}
+```
+
+---
+
+## Stored Strings
+
+A stored string is a `val_t` value that **owns** a NUL-terminated string whose
+memory is managed by the library. The string bytes live in a library-managed
+arena; the `val_t` handle encodes the position of the string inside the arena
+(see [String conversion](#string-representation) for how it prints).
+
+```c
+val_t    valstore(str);          // Copy str into the arena, return a handle
+void    *valrecall(x);           // Return a pointer to the stored string
+int      valdel(x);              // Delete the stored string (tombstone)
+int      valisstored(x);         // Check if x is a stored string
+```
+
+**Purpose**: Hand off ownership of a string to the library, so a `val_t` can be
+stored in a container without the caller having to keep the string alive or
+free it. `valstore(NULL)` is rejected with `errno = EINVAL`.
+
+A stored value **behaves as a string in every val function**:
+
+- `valcmp()` compares it by content (`strcmp`), so `valstore("x")` and
+  `val("x")` compare equal.
+- `valhash()` hashes the content (same hash as a `char*` with the same text).
+- `valtostr()` prints the content.
+- `valtoptr()` returns a pointer to the content.
+- `valtoint()` parses the content with `strtoll` (base 10); non-numeric
+  content yields `0`.
+
+Because the bytes live in an arena, any pointer returned by `valrecall()` or
+`valtoptr()` is only valid until the *next* `valstore()` call (the arena may
+reallocate). Keep the handles, not the pointers.
+
+### Deleting stored strings
+
+`valdel(x)` deletes a stored string with tombstone semantics: the slot and
+bytes are kept, but `valrecall()`/`valtoptr()`/`valget` return `NULL`/`valnil`
+with `errno = ENOENT` for it afterwards, and the handle can be re-inserted
+with `valstore()`.
+
+### Inspecting the arena
+
+Each store (there is currently one, index 0) keeps a registry of its entries:
+
+```c
+int32_t val_store_cnt(n);      // Number of entries (tombstones included)
+int32_t val_store_sze(n);      // Arena capacity in bytes
+int32_t val_store_top(n);      // Index of the last entry (== cnt)
+int32_t val_store_len(n, i);   // Length in bytes (NUL included) of entry i
+int32_t val_store_offset(n, i);// Arena offset of entry i (1-based indices)
+```
+
+### Example
+
+```c
+#include "vallib.h"
+#include <stdio.h>
+
+int main(void) {
+    val_t s = valstore("pippo");
+
+    printf("stored: %s\n", valisstored(s) ? "yes" : "no");
+    printf("content: %s\n", (char *)valrecall(s));
+    printf("cmp: %d\n", valcmp(s, val("pippo")));   // 0: same content
+
+    valdel(s);
+    printf("after del: %s\n", valrecall(s) ? "still there" : "gone");
+    return 0;
+}
+```
+
+---
+
+## Data Structures
+
+The companion module (`vallib.h` + `vallib.c`) provides dynamic data
+structures built on `val_t`. There is a single container type — the **vec** —
+a dynamically resized array of `val_t` values, that can be used as an array, a
+stack, a queue, or a map depending on the functions you call on it.
+
+```c
+val_t valvec(n);   // Create a vec (n = optional initial capacity)
+val_t valfree(a);  // Free a vec and its storage; returns valnullptr
+```
+
+### Vectors
+
+```c
+int32_t valsize(a);     // Capacity
+int32_t valcount(a);    // Number of elements
+int valset(a, i, v);    // Set element at index i (integer index)
+val_t valget(a, i);     // Get element at index i
+int valdel(a, f, t);    // Delete the elements in [f, t]
+int valins(a, i, e);    // Insert element e at index i
+int valclear(a);        // Remove all elements
+```
+
+Indices are zero-based; negative indices count from the end (`-1` is the last
+element). `valset()` grows the vec as needed. `valset()` is **array-only**: the
+index must be an integer (for key/value maps see
+[Maps](#maps)).
+
+### Stacks
+
+```c
+val_t valpush(a, e);  // Push e on top of the stack
+val_t valtop(a);      // Peek at the top element (without removing it)
+val_t valpop(a);      // Pop the top element and remove it
+int   valisempty(a);  // True if the stack is empty
+```
+
+### Queues
+
+```c
+val_t valenq(a, e);   // Enqueue e at the back of the queue
+val_t valdeq(a);      // Dequeue the first element and remove it
+val_t valfirst(a);    // Peek at the first element (without removing it)
+val_t vallast(a);     // Peek at the last element (without removing it)
+```
+
+The queue is compacted automatically as elements are dequeued.
+
+### Maps
+
+A vec can be used as a **map**: a sorted array of (key, value) pairs. Keys are
+unique — inserting an existing key updates the value in place.
+
+```c
+int valmap(m, k, v);  // Insert or update the pair key k -> value v
+val_t valget(m, k);   // Look up the value for key k
+int valdel(m, k);     // Delete the entry for key k
+```
+
+- **Keys**: any `val_t` value. `char*` and `val_t` keys are accepted directly;
+  **integer keys must be wrapped** in `val()` because `valget()`/`valdel()`
+  dispatch integer arguments to the array functions (e.g. `valget(m, val(42))`).
+- **Equality**: keys are compared with `valcmp()`, so `1` and `1.0` are the
+  same key, and a stored string and a `char*` with the same text are the same
+  key.
+- **Not found**: `valget()` returns `valnil` with `errno = ENOENT` (distinct
+  from a stored `nil` value, which returns `errno = 0`).
+- **Conversion**: the first `valmap()` call converts a fresh, empty vec into a
+  map. Converting a vec that already contains elements fails with
+  `errno = EINVAL`. Mixing array and map operations on the same vec is
+  undefined.
+- **Deletion**: `valdel()` marks the entry as deleted (tombstone) — O(log n);
+  tombstones are compacted away automatically when they exceed a quarter of
+  the map.
+- **Counts**: for maps, `valcount()` and `valsize()` report the number of
+  entries (not val_t slots).
+
+### Sorting and Searching
+
+```c
+int    valsort(a [, cmp [, aux]]);     // Sort in place (default: valcmp)
+int32_t valbsearch(a, e [, cmp [, aux]]); // Binary search for e
+```
+
+`valsort()` sorts the vec in place (quicksort); `valbsearch()` finds an element
+in a sorted vec and returns its index, or -1. Both accept an optional
+comparator and an auxiliary value passed to it (`valaux()`).
+
+### Example
+
+```c
+#include "vallib.h"
+#include <stdio.h>
+
+int main(void) {
+    val_t m = valvec(0);
+
+    valmap(m, "pippo", "pluto");
+    valmap(m, 42, "answer");
+    valmap(m, "pippo", "paperino");   // updates the existing entry
+
+    printf("count: %d\n", (int)valcount(m));       // 2
+    printf("pippo: %s\n", (char *)valtoptr(valget(m, "pippo")));
+    printf("42:    %s\n", (char *)valtoptr(valget(m, val(42))));
+
+    valdel(m, 42);
+    printf("after del: %s\n", valget(m, val(42)) ? "found" : "gone");
+
+    m = valfree(m);
+    return 0;
+}
 ```
 
 ---

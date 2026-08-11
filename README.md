@@ -3,12 +3,14 @@
 [![Version](https://img.shields.io/badge/version-0.4.011%20RC-blue.svg)](https://github.com/rdentato/val)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`val` is a single-header, zero-dependency library that implements a dynamic **`val_t`** type for C programs via **NaN-boxing**. It can store:
+`val` is a zero-dependency library that implements a dynamic **`val_t`** type for C programs via **NaN-boxing**. It can store:
 
 * IEEE-754 double-precision floats
 * Signed and unsigned 52-bit integers (as double)
 * Typed pointers (void, char, custom pointers)
-* Booleans, `nil`, and user-defined constants
+* Booleans, `nil` (and the nil-family constants `valnone`, `valundefined`, `valtombstone`, `valdeleted`), and user-defined constants
+* Pairs (a 16-bit and a 32-bit value in one word)
+* Stored strings (library-owned strings, via `vallib`)
 
 All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 
@@ -45,20 +47,38 @@ All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 
   * `valcmp(a,b)` returns –1, 0, or 1.
   * `valhash(a)` produces a 32-bit FNV1a or Murmur-style hash.
-* **Zero dependencies**: Just include `val.h` in any C11/C17 project.
-* **Extensible**: Define additional pointer-tags or constants via macros.
+* **Pairs**: `valpair(l,r)` packs a 16-bit and a 32-bit value in one word.
+* **Data structures** (in `vallib`): a vec used as a dynamic array, stack,
+  queue, or **map** with `val_t` keys — plus sorting, searching, and
+  library-owned **stored strings**.
+* **Zero dependencies**: just include `val.h` in any C11/C17 project (data
+  structures need `vallib.h` + `vallib.c`).
+* **Extensible**: define additional pointer-tags or constants via macros.
 
 ---
 
 ## Installation
 
-Simply copy `val.h` into your project’s include directory, then in your source:
+For the core `val` functions, simply copy `val.h` into your project’s include
+directory, then in your source:
 
 ```c
 #include "val.h"
 ```
 
 No build steps required.
+
+For the data structures (`valvec`, stacks, queues, maps, stored strings), copy
+`vallib.h` and `vallib.c` as well, include `vallib.h`, and compile and link
+`vallib.c` with your sources:
+
+```c
+#include "vallib.h"
+```
+
+```sh
+cc myprog.c vallib.c -o myprog
+```
 
 ---
 

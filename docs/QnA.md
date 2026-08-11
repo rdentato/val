@@ -293,17 +293,20 @@ You can pass a string to `valconst()` to create such constant with the following
 
 From the example is clear that (especially for debugging), having a symbolic string makes it easier to interpret a message.
 
-Note that for the sake of comparison and hashing, symbolic constants are treated as strings:
+Note that for the sake of comparison and hashing, **stored strings** are treated as strings (by content), while symbolic constants are **not**: they compare by their raw encoded value.
 
 ```c
 int main()
 {
   val_t s = val("help!");
   val_t h = valconst("help!");
+  val_t st = valstore("help!");
 
   if (valeq(s,h)) print("Error! they are two different val_t values\n");
 
-  if (valcmp(s,h) == 0) print("Correct! The strings are the same!\n");
+  if (valcmp(s,st) == 0) print("Correct! Stored strings are the same!\n");
+
+  if (valcmp(s,h) != 0) print("Correct! Symbolic constants compare by value\n");
 }
 ```
 
@@ -316,6 +319,10 @@ All constants use the NaN space with top bits `7FF9`. For the predefined constan
   | `7FF9 93F0` | `1001 00`**`11 1111`** `0000` | Boolean      |
   | `7FF9 B3F0` | `1011 00`**`11 1111`** `0000` | Nil          |  
   | `7FF9 C3F0` | `1100 00`**`11 1111`** `0000` | User defined |
+
+The nil family occupies the adjacent patterns `7FF9 B3F1`–`7FF9 B3F4` for
+`valnone`, `valundefined`, `valtombstone` and `valdeleted`. They are all
+distinct constants, and only `7FF9 B3F0` satisfies `valisnil()`.
 
 They have been chosen so that the value `3F` (`0011 1111`) appears eaxctly in the middle of a character break in a symbolic constant.
 Now, `3F` is the encoding of `\0` for symbolic contstant and it is used as a terminator. If a symbolic constant had those bit sets, it means that it is 6 characters long, but it this is the case, also the last bits would be `1` (you can see this in the `valsymconst()` function)! So by checking that just `3F` appears in that poisition, one can discriminate between symbolic constants ant the others.
@@ -349,6 +356,11 @@ The values `-inf`, `inf` are considered numbers as they have the Signaling bit c
 **Answer**: Beside numbers, `valtoint()` also operates on constants converting them to an integer (e.g. `valnil` is converted to `0`). User defined numeric constants operate with a 32 bits number, symbolic constants use all the 48 bits of payload and so do pointers. `valtoint()` must stay consistent with this behaviour.
 Note that regardless the type, `valtoint()` returns an 64 bit integer.
 
+**Question**: What does `valtoint()` return for a stored string?
+**Answer**: It parses the stored content with `strtoll()` (base 10);
+non-numeric content yields `0`. This makes a stored string behave like the
+string value it is (`valtoint(valstore("123")) == 123`).
+
 ## 9. String conversion
 
 **Question**: How does `valtostr()` choose formatting based on type. 
@@ -369,24 +381,37 @@ You have to access the string itself thoroug the field `.str`. The safest way is
 
 once the function ends, the variable is discarded and the string is no longer accessible.
 
+**Question**: How are pairs and stored strings formatted?
+**Answer**: Pairs print as `<L,R>` in hexadecimal (or with a custom format,
+e.g. `valtostr(p,"<%PRIu16,%PRIu32>")`). Stored strings print their content,
+truncated to fit the 32-character buffer. Note that the content is read from
+the arena, so a deleted stored string prints as an empty string.
+
 **Question**: Could concurrent stringification cause issues?
 **Answer**: No, because no global data is involved, each call has its own `valtostr_t` value to work with.
 
 
 ## 10. Comparison & hashing
 
-> **Note**: The functions `valcmp()` and `valhash()` are only provided for your convenience. Your application might have different needs. For example, the `valcmp()` function treats symbolic constants as string, while you may want to keep them separate.
+> **Note**: The functions `valcmp()` and `valhash()` are only provided for your convenience. Your application might have different needs. For example, the `valcmp()` function treats stored strings and buffers as strings by content, while you may want to keep them separate.
 > Always consider whether the provided functions are right for you or you need to write your own.
 
 **Question**: What ordering does `valcmp` impose between numbers, strings (char\*/buffers), constants, and other pointers, and is this total order consistent across platforms?
 
 **Answer**: `valcmp(v1, v2)` use the following criteria:
 
-- **Strings and buffers:** Using `strcmp`.
+- **Strings, buffers and stored strings:** Using `strcmp` on the content. A stored string and a `char*` (or buffer) with the same text compare equal.
+- **Pairs**: compared by their (left, right) components, lexicographically.
 - **Numbers**: compared by numerical ordering.
-- **Anything else**: compared by their raw value (order is governed by their type encoding).
+- **Anything else** (including symbolic and numeric constants): compared by their raw value (order is governed by their type encoding).
 
   This scheme is consistent across platforms provided identical pointer ordering and endianness.
+
+**Question**: Do `valcmp()` and `valhash()` have side effects on `errno`?
+**Answer**: No. They are pure functions and never touch `errno`, so they can be
+used freely inside comparators and hash-table code without disturbing the
+caller's error state. (Some other functions, like `valtoptr()` and
+`valtodouble()`, do set `errno` to report conversion errors.)
 
 ## 11. Versioning
 
@@ -407,4 +432,21 @@ number encodes the semantic versioning scheme. For example this is the encoding 
 - **Question**: What existing test suite or example programs cover the edge-cases of NaN boxing, pointer tagging, constant encoding, and error paths, and where should new tests be added for untested scenarios (e.g., reserved patterns, misaligned pointers)?
 
 - **Answer**: Existing tests in the `tests/` directory cover a wide range of features. Also they serve as examples for the library usage.
+
+## 13. Maps & stored strings
+
+**Question**: How is the map implemented, and why a sorted array rather than a hash table?
+**Answer**: A map is a vec whose (key, value) pairs are kept sorted on the key; lookup is a binary search via `valcmp()`, insertion of a new key shifts the tail, and inserting an existing key just updates the value in place. The sorted-array approach was chosen because:
+
+- `valcmp()` is content-based, so `1` and `1.0` are the same key, and a stored string and a `char*` with the same text are the same key. A hash table would need hash values consistent with that equality (hash-normalization for numbers), which the sorted array sidesteps entirely.
+- Lookups are cache-friendly and, for the sizes this library targets (tens to low thousands of entries), faster than hashing.
+- Deletion is O(log n): entries are tombstoned and compacted away when they exceed a quarter of the map.
+
+Should a workload ever demand it, the same API can be backed by an overflow buffer or blocked (B-tree-like) array without changing callers.
+
+**Question**: Why do stored strings live in an arena with a registry, and why is deletion a tombstone?
+**Answer**: The arena lets a `val_t` own its string without the caller managing lifetime, and the registry (offset/len per entry) gives O(1)-ish introspection (`val_store_len()`, `val_store_offset()`, ...) and stable handles: deleting marks the entry (tombstone) so other handles and offsets stay valid, and the bytes are reclaimed when the arena is redesigned/reclaimed later. Handles are by offset, so they remain valid across growth; only pointers returned by `valrecall()`/`valtoptr()` are invalidated by the next `valstore()` (the arena may reallocate).
+
+**Question**: How does the library find a stored string given its handle?
+**Answer**: Handles encode the arena offset, and the registry keeps one entry per stored string. Because entries are appended with monotonically increasing offsets, and tombstones keep their slot, the registry is always **sorted by offset** — so `valrecall()`, `valcmp()`, `valhash()` and friends look up a handle with a **binary search (O(log n))** instead of a linear scan. That invariant is load-bearing: future arena changes (e.g. reclaiming tombstone bytes) must preserve the sorted-by-offset order or switch to an index.
 
