@@ -8,23 +8,10 @@
 #include <time.h>
 #include "vallib.h"
 
-typedef struct {
-  int x;
-  int y;
-} point2D_t;
-
-typedef struct {
-  int x;
-  int y;
-  int z;
-} point3D_t;
-
 tstsuite("Store") {
 
   tstcase("Stored strings") {
-    char *x;
     val_t y;
-    val_t z;
     tstnote("SIZE: %d CNT: %d",val_store_sze(0),val_store_cnt(0));
     tstcheck(val_store_cnt(0) == 0);
     y = valstore("pippo");
@@ -40,6 +27,7 @@ tstsuite("Store") {
     tstcheck(val_store_offset(0,1) == 0);
     tstcheck(val_store_len(0,2) == 16);
     tstcheck(val_store_offset(0,2) == 8);
+    tstcheck(valisstored(y));
  
 
 #if 0

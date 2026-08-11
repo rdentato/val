@@ -110,13 +110,7 @@ static int make_room_vec(valptr_vec_t v, int32_t ndx)
 
     val_t *new_vec = realloc(v->vec, new_size * sizeof(val_t));
 
-    // fprintf(stderr,">>> realloc (vec: %p)\n", new_vec);
-
     if (new_vec == NULL) {errno = ENOMEM; return 0; }
-
-    // set the newly allocated area to 0;
-    // fprintf(stderr,">>> about to memset vec: %p size: %d\n", &(new_vec[v->sze]), (new_size - v->sze) * (int)sizeof(val_t));
-    memset(&(new_vec[v->sze]), 0, (new_size - v->sze) * sizeof(val_t));
 
     v->vec = new_vec;
     v->sze = new_size;
@@ -138,6 +132,10 @@ val_t val_vec(int32_t initial_sze)
   vec_ptr->end = 0;
   vec_ptr->fst = 0;
   vec_ptr->sze = 0;
+  vec_ptr->flg = 0;
+  vec_ptr->del = 0;
+  vec_ptr->dsz = 0;
+  vec_ptr->dead = NULL;
 
   if ((0 < initial_sze) && (initial_sze < VAL_VEC_MAXNDX)) {
     if (!make_room_vec(vec_ptr,initial_sze)) {
@@ -154,7 +152,9 @@ val_t valfree(val_t a)
   if (valisvecptr(a)) {
     valptr_vec_t vec_ptr = valtoptr(a);
     if (vec_ptr->vec != NULL) free(vec_ptr->vec);
+    if (vec_ptr->dead != NULL) free(vec_ptr->dead);
     vec_ptr->vec = NULL;
+    vec_ptr->dead = NULL;
     vec_ptr->end = 0;
     vec_ptr->fst = 0;
     vec_ptr->sze = 0;
@@ -199,6 +199,14 @@ int val_set_vec(val_t a, int32_t ndx, val_t elm)
 
   if (!make_room_vec(vec_ptr, ndx)) return 0;
 
+  // Zero the gap between the previous end and ndx, so that reads of
+  // previously-unset elements below the new end return 0.0. This is the only
+  // region that can become visible, so it is zeroed exactly (not the whole
+  // capacity): appending is O(1) even across reallocations.
+  if (ndx > vec_ptr->end) {
+    memset(&vec_ptr->vec[vec_ptr->end], 0, (ndx - vec_ptr->end) * sizeof(val_t));
+  }
+
   vec_ptr->vec[ndx] = elm;
 
   if (ndx >= vec_ptr->end) vec_ptr->end = ndx+1;
@@ -237,6 +245,7 @@ int32_t valsize(val_t a) {
   // beahave well if treated as a vector from now on.
   val_compact_queue_always(vec_ptr);
   
+  if (vec_ptr->flg & VAL_VEC_MAP) return vec_ptr->sze/2;
   return vec_ptr->sze;
 }
 
@@ -343,11 +352,135 @@ int val_ins(val_t a, int32_t ndx, val_t elm, int32_t rep)
 }
 
 // HASH
+// MAP
+// The map is a sorted array of (key, value) pairs: entry i occupies the
+// val_t slots [2i, 2i+1], sorted on the key via valcmp(). Keys are unique:
+// inserting an existing key updates the value in place. Deleted entries are
+// tombstoned (dead[] flag) and compacted away when they exceed 1/4 of the map.
+
+// Binary search for the entry with the given key.
+// Returns the entry index where the key is, or where it would be inserted.
+static int32_t val_map_ndx(valptr_vec_t v, val_t key, int *found)
+{
+  int32_t lo = 0;
+  int32_t hi = v->end / 2;
+
+  while (lo < hi) {
+    int32_t mid = lo + (hi - lo) / 2;
+    if (valcmp(v->vec[2*mid], key) < 0) lo = mid + 1;
+    else hi = mid;
+  }
+
+  *found = (lo < v->end/2) && (valcmp(v->vec[2*lo], key) == 0);
+  return lo;
+}
+
+// Grow the per-entry deleted-flags array to hold at least `n` entries.
+static int make_room_dead(valptr_vec_t v, int32_t n)
+{
+  if (n > v->dsz) {
+    int32_t newdsz = v->dsz ? v->dsz : 8;
+    while (newdsz < n) newdsz = mul_phi(newdsz);
+    uint8_t *newdead = realloc(v->dead, newdsz);
+    if (newdead == NULL) { errno = ENOMEM; return 0; }
+    memset(newdead + v->dsz, 0, newdsz - v->dsz);
+    v->dead = newdead;
+    v->dsz  = newdsz;
+  }
+  errno = 0;
+  return 1;
+}
+
+// Remove tombstoned entries in a single pass (amortized O(1) per delete).
+static void val_map_compact(valptr_vec_t v)
+{
+  int32_t n = v->end / 2;
+  int32_t dst = 0;
+
+  for (int32_t src = 0; src < n; src++) {
+    if (!v->dead[src]) {
+      if (dst != src) {
+        v->vec[2*dst]   = v->vec[2*src];
+        v->vec[2*dst+1] = v->vec[2*src+1];
+        v->dead[dst]    = 0;
+      }
+      dst++;
+    }
+  }
+
+  v->end = 2*dst;
+  v->del = 0;
+  memset(&v->dead[dst], 0, n - dst);
+}
+
 int val_set_map(val_t a, val_t key, val_t elm)
-{ return 0; }
+{
+  valptr_vec_t v = val_vecptr(a);
+  if (v == NULL) return 0;
+
+  if (!(v->flg & VAL_VEC_MAP)) { // Convert a fresh vec into a map
+    if (v->end != 0 || v->fst != 0) { errno = EINVAL; return 0; }
+    v->flg |= VAL_VEC_MAP;
+  }
+
+  int found;
+  int32_t ndx = val_map_ndx(v, key, &found);
+
+  if (found) { // Update the value in place (or revive a tombstoned entry)
+    v->vec[2*ndx+1] = elm;
+    if (v->dead[ndx]) { v->dead[ndx] = 0; v->del -= 1; }
+    errno = 0;
+    return 1;
+  }
+
+  // Insert a new entry at position ndx
+  int32_t n = v->end / 2;
+  if (!make_room_vec(v, v->end + 1)) return 0;
+  if (!make_room_dead(v, n + 1)) return 0;
+
+  memmove(&v->vec[2*(ndx+1)], &v->vec[2*ndx], 2*(n-ndx) * sizeof(val_t));
+  memmove(&v->dead[ndx+1], &v->dead[ndx], n-ndx);
+  v->vec[2*ndx]   = key;
+  v->vec[2*ndx+1] = elm;
+  v->dead[ndx]    = 0;
+  v->end += 2;
+  errno = 0;
+  return 1;
+}
 
 val_t val_get_map(val_t a, val_t key)
-{ return valnil; }
+{
+  valptr_vec_t v = val_vecptr(a);
+  if (v == NULL) return valnil;
+  if (!(v->flg & VAL_VEC_MAP)) { errno = EINVAL; return valnil; }
+
+  int found;
+  int32_t ndx = val_map_ndx(v, key, &found);
+
+  if (found && !v->dead[ndx]) { errno = 0; return v->vec[2*ndx+1]; }
+
+  errno = ENOENT;
+  return valnil;
+}
+
+int val_del_map(val_t a, val_t key)
+{
+  valptr_vec_t v = val_vecptr(a);
+  if (v == NULL) return 0;
+  if (!(v->flg & VAL_VEC_MAP)) { errno = EINVAL; return 0; }
+
+  int found;
+  int32_t ndx = val_map_ndx(v, key, &found);
+
+  if (!found || v->dead[ndx]) { errno = ENOENT; return 0; }
+
+  v->dead[ndx] = 1;
+  v->del += 1;
+  errno = 0;
+
+  if (v->del * 4 >= v->end / 2) val_map_compact(v); // Too many tombstones
+  return 1;
+}
 
 // QUEUE
 
@@ -417,50 +550,120 @@ int32_t val_bsearch(val_t a, val_t key, val_cmp_t cmp, val_t aux)
 // store
 val_store_t val_stores[VAL_NUM_STORES] = { 0 };
 
-val_t val_store(void *elm, int32_t len, int32_t isstring)
+val_t val_store(const char *str)
 {
   int nstore = 0;
-  // nstore = valhash(elm) % VAL_NUM_STORES;
-  //  fprintf(stderr, ">>> nstore: %d\n",nstore);
-  
-  if (len == 0 && isstring) len = strlen(elm) +1;
-  len += isstring;
+  val_store_t *st = &val_stores[nstore];
+  // nstore = valhash(str) % VAL_NUM_STORES;
 
-  val_t ret = (val_t) {VAL_STORED_0 | ((int64_t)nstore << 32) | val_stores[nstore].end};
-  int32_t newend = val_stores[nstore].end + len;
+  if (str == NULL) { errno = EINVAL; return valnil; }
+
+  int32_t len = strlen(str) + 1; // Include the NUL terminator
+
+  // Make room in the data arena
+  int32_t newend = st->end + len;
   newend = (newend + 7) & ~((int32_t)7); // Align to eight!
-
-  if (newend >= val_stores[nstore].sze) {
-    int32_t newsze = val_stores[nstore].sze;
-    if (newsze == 0) { newsze = 16; val_stores[nstore].data = NULL; }
+  if (newend >= st->sze) {
+    int32_t newsze = st->sze;
+    if (newsze == 0) { newsze = 16; st->data = NULL; }
     while (newsze <= newend) {
       newsze = mul_phi(newsze);
     }
-    uint8_t *newdata = realloc(val_stores[nstore].data,newsze);
+    uint8_t *newdata = realloc(st->data,newsze);
     if (newdata == NULL) {
       errno = ENOMEM;
       return valnil;
     }
-    val_stores[nstore].data = newdata;
+    st->data = newdata;
+    st->sze = newsze; // Remember the new capacity
   }
-  memcpy(val_stores[nstore].data+val_stores[nstore].end,elm,len);
-  if (isstring) {
-    val_stores[nstore].data[val_stores[nstore].end + len - 1] = '\0';
+
+  // Make room in the entries registry
+  if (st->cnt >= st->cap) {
+    int32_t newcap = st->cap;
+    if (newcap == 0) newcap = 8;
+    while (newcap <= st->cnt) {
+      newcap = mul_phi(newcap);
+    }
+    val_store_ent_t *newent = realloc(st->ent,newcap*sizeof(val_store_ent_t));
+    if (newent == NULL) {
+      errno = ENOMEM;
+      return valnil;
+    }
+    st->ent = newent;
+    st->cap = newcap;
   }
+
+  memcpy(st->data+st->end,str,len);
+  st->data[st->end + len - 1] = '\0'; // Ensure termination
+
+  st->ent[st->cnt] = (val_store_ent_t){.offset = st->end, .len = len, .deleted = 0};
+  st->cnt += 1;
+
+  val_t ret = (val_t) {VAL_STORED_0 | ((int64_t)nstore << 32) | st->end};
+  st->end = newend;
   errno = 0;
-  val_stores[nstore].end = newend;
-  fprintf(stderr, ">>> ret: %s\n",valtostr(ret).str);
   return ret;
+}
+
+int val_del_store(val_t v)
+{
+  if (valisstored(v)) {
+    uint32_t nstore = (uint32_t)((v.v >> 32) & 0x0F);
+    uint32_t offset = (uint32_t)(v.v & VAL_32BIT_MASK);
+    if (nstore < VAL_NUM_STORES) {
+      val_store_t *st = &val_stores[nstore];
+      int32_t ndx = val_store_ndx_1(st, offset);
+      if (ndx >= 0) {
+        st->ent[ndx].deleted = 1; // Tombstone: bytes and slot are kept
+        errno = 0;
+        return 1;
+      }
+    }
+  }
+  errno = EINVAL;
+  return 0;
+}
+
+int32_t val_store_cnt(int32_t nstore)
+{
+  if (nstore < 0 || nstore >= VAL_NUM_STORES) { errno = EINVAL; return -1; }
+  return val_stores[nstore].cnt;
+}
+
+int32_t val_store_sze(int32_t nstore)
+{
+  if (nstore < 0 || nstore >= VAL_NUM_STORES) { errno = EINVAL; return -1; }
+  return val_stores[nstore].sze;
+}
+
+int32_t val_store_top(int32_t nstore)
+{
+  if (nstore < 0 || nstore >= VAL_NUM_STORES) { errno = EINVAL; return -1; }
+  return val_stores[nstore].cnt;
+}
+
+int32_t val_store_len(int32_t nstore, int32_t ndx)
+{
+  if (nstore < 0 || nstore >= VAL_NUM_STORES) { errno = EINVAL; return -1; }
+  val_store_t *st = &val_stores[nstore];
+  if (ndx < 1 || ndx > st->cnt) { errno = EINVAL; return -1; }
+  return st->ent[ndx-1].len;
+}
+
+int32_t val_store_offset(int32_t nstore, int32_t ndx)
+{
+  if (nstore < 0 || nstore >= VAL_NUM_STORES) { errno = EINVAL; return -1; }
+  val_store_t *st = &val_stores[nstore];
+  if (ndx < 1 || ndx > st->cnt) { errno = EINVAL; return -1; }
+  return st->ent[ndx-1].offset;
 }
 
 void *valrecall(val_t x) 
 {
-  if (valisstored(x)) { 
-    errno = 0;
-    uint32_t offset = x.v & VAL_32BIT_MASK;
-    int32_t nstore = (x.v >> 32) & 0x0F;
-    if (offset < val_stores[nstore].end)
-      return val_stores[nstore].data + offset;
+  if (valisstored(x)) {
+    void *ret = val_recall_1(x);
+    if (ret != NULL) { errno = 0; return ret; }
   }
 
   errno = EINVAL;

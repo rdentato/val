@@ -6,6 +6,7 @@
 #define VAL_VERSION 0x0004011C
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
@@ -118,6 +119,10 @@
 //                                      |   |   |   |   |
 #define VAL_FALSE          ((uint64_t)0x7FF993F000000000)
 #define VAL_NIL            ((uint64_t)0x7FF9B3F000000000)
+#define VAL_NONE           ((uint64_t)0x7FF9B3F100000000)
+#define VAL_UNDEFINED      ((uint64_t)0x7FF9B3F200000000)
+#define VAL_TOMBSTONE      ((uint64_t)0x7FF9B3F300000000)
+#define VAL_DELETED        ((uint64_t)0x7FF9B3F400000000)
 #define VAL_CONST_0        ((uint64_t)0x7FF9C3F000000000)
 #define VAL_CONST_NV_MASK  ((uint64_t)0xFFFF0FFF00000000)
 #define VAL_CONST_NV       ((uint64_t)0x7FF903F000000000)
@@ -130,6 +135,37 @@
 #define VAL_STORED_MASK    ((uint64_t)0xFFFFFFF000000000)
 #define VAL_NSTORE_MASK    ((uint64_t)0x0000000F00000000)
 #define VAL_STORED_0       ((uint64_t)0x7FF9E3F000000000)
+//
+// Stored strings: a val_t that references a NUL-terminated string owned by the
+// library. The handle encodes (store#, offset) into the arena below. It behaves
+// as a string in valcmp(), valhash(), valtostr(), valtoptr() and valtoint().
+//
+#define VAL_NUM_STORES 1
+
+typedef struct val_store_ent_s {
+  int32_t offset;
+  int32_t len;
+  uint8_t deleted; // Tombstone: slot and bytes are kept, value is dead
+} val_store_ent_t;
+
+typedef struct val_store_s {
+  uint8_t *data;
+  int32_t  sze;
+  int32_t  end;
+  int32_t  cnt;    // Number of registry entries (tombstones included)
+  int32_t  cap;    // Capacity of the registry
+  val_store_ent_t *ent;
+} val_store_t;
+
+#if defined(VAL_CODE) && !defined(VAL_LIB)
+  // Standalone val.h usage: a per-translation-unit placeholder arena. It is
+  // never populated (val_store() is only available with the library) and
+  // exists only so the inline functions below can reference the symbol.
+  static val_store_t val_stores[VAL_NUM_STORES] = {0};
+#else
+  // Library usage: the arena is instantiated in vallib.c.
+  extern val_store_t val_stores[VAL_NUM_STORES];
+#endif
 //                                      |   |   |   |   |
 #define VAL_PAIR           ((uint64_t)0xFFF9000000000000)
 // =========
@@ -380,6 +416,10 @@ static inline val_t val_fromval(val_t v)        {return v;}
 
 // NIL A nil value to signal a void value
 #define valnil ((const val_t){VAL_NIL})
+#define valnone ((const val_t){VAL_NONE})
+#define valundefined ((const val_t){VAL_UNDEFINED})
+#define valtombstone ((const val_t){VAL_TOMBSTONE})
+#define valdeleted ((const val_t){VAL_DELETED})
 #define valisnil(x)   ((val(x).v == VAL_NIL))
 
 // User defined constants
@@ -535,12 +575,47 @@ static inline double val_todouble(val_t v) {
   return d;
 }
 
+// Private: index of the registry entry holding the given offset, or -1.
+// The registry is sorted by offset (entries are appended with monotonically
+// increasing offsets and tombstones keep their slot), so binary search works.
+static inline int32_t val_store_ndx_1(val_store_t *st, uint32_t offset) {
+  int32_t lo = 0;
+  int32_t hi = st->cnt;
+  while (lo < hi) {
+    int32_t mid = lo + (hi - lo) / 2;
+    if ((uint32_t)st->ent[mid].offset < offset) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo < st->cnt && (uint32_t)st->ent[lo].offset == offset) return lo;
+  return -1;
+}
+
+// Private: returns the string stored at v, or NULL if the handle is invalid
+// (unknown offset or a tombstoned entry).
+static inline void *val_recall_1(val_t v) {
+  if (valisstored(v)) {
+    uint32_t nstore = (uint32_t)((v.v >> 32) & 0x0F);
+    uint32_t offset = (uint32_t)(v.v & VAL_32BIT_MASK);
+    if (nstore < VAL_NUM_STORES) {
+      val_store_t *st = &val_stores[nstore];
+      int32_t ndx = val_store_ndx_1(st, offset);
+      if (ndx >= 0 && !st->ent[ndx].deleted)
+        return (void *)(st->data + offset);
+    }
+  }
+  return NULL;
+}
+
 #define valtoint(v)  val_toint(val(v))
 static inline int64_t val_toint(val_t v) {
   if (val_isnumber(v)) {
     double d;
     memcpy(&d,&v,sizeof(double));
     return (int64_t)d;
+  }
+  if (valisstored(v)) { // Stored strings are parsed as numbers
+    char *str = (char *)val_recall_1(v);
+    return str? strtoll(str, NULL, 10) : 0;
   }
   if (val_is_any_NV_const(v)) { // Only the lower 32bits
     return ((v).v & VAL_32BIT_MASK);  
@@ -560,6 +635,11 @@ static inline  _Bool val_tobool(val_t v)  {
 
 #define valtoptr(v) val_toptr(val(v))
 static inline   void *val_toptr(val_t v) {
+  if (valisstored(v)) { // Stored strings: return the content pointer
+    void *ret = val_recall_1(v);
+    errno = ret? 0 : EINVAL;
+    return ret;
+  }
   int taggable = val_check_taggable_ptr(v);
 
   if (taggable < 0) { errno = EINVAL; return NULL; }
@@ -584,7 +664,11 @@ VAL_STATIC_INLINE valtostr_t val_tostr_2(val_t v, char *fmt) {
   else if (val_issymconst_1(v)) 
          ret = valsymtostr(v);
   else if (valispair(v))
-         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%" PRIX16 ",%" PRIX32 ">", (uint16_t)valleft(v),(uint32_t)valright(v));
+         snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "<%%" PRIX16 ",%%" PRIX32 ">", (uint16_t)valleft(v),(uint32_t)valright(v));
+  else if (valisstored(v)) { // Stored strings print their content
+    char *sv = (char *)val_recall_1(v);
+    snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "%s", sv? sv : val_emptystr);
+  }
   else if (val_is_num_const(v))
          snprintf(ret.str, VAL_STR_MAX_LEN, fmt? fmt : "[%" PRIX32 "]", (uint32_t)valtoint(v));
   else if (val_is_any_ptr(v))
@@ -615,48 +699,55 @@ VAL_STATIC_INLINE uint32_t val_hash(val_t v);
 #ifdef VAL_CODE
 static inline char *val_get_charptr(val_t v) {
   char *ret = val_emptystr;
-  if (valischarptr(v)) ret = valtoptr(v);
+  if (valischarptr(v)) ret = (char *)(uintptr_t)(v.v & VAL_PAYLOAD_MASK);
   else if (valisbufptr(v)) {
-    char **v_ptr = valtoptr(v);
+    char **v_ptr = (char **)(uintptr_t)(v.v & VAL_PAYLOAD_MASK & ~VAL_TAG_MASK);
     ret = v_ptr ? *v_ptr : NULL;
   }
+  else if (valisstored(v)) ret = (char *)val_recall_1(v);
   return ret;
 }
 
 // This compares two val_t values. Like the hash function below, it is provided just for convenience 
 // since your criteria for comparison and hashing might be different.
 VAL_STATIC_INLINE int val_cmp(val_t a, val_t b, void *aux) {
-  char *sa = val_emptystr;
-  char *sb = val_emptystr;
+  (void)aux; // Reserved for future use
 
-  if (valispair(a) && valispair(b)) {
-    if (a.v >> 32 == (b.v >> 32)) return 0;
-    return (a.v > b.v)? 1 : -1 ;
+  // Fast path: identical words compare equal (integers, bit-identical
+  // doubles, same pointer/constant/pair/stored handle).
+  if (a.v == b.v) return 0;
+
+  // Numbers (including integers stored as doubles): compare numerically.
+  // This also makes 1 and 1.0 the same value.
+  if (val_isnumber(a) && val_isnumber(b)) {
+    double da;
+    double db;
+    memcpy(&da, &a.v, sizeof(double));
+    memcpy(&db, &b.v, sizeof(double));
+    return (da > db) ? 1 : (da < db) ? -1 : 0;
   }
 
-  sa = val_get_charptr(a);
-  
+  // Strings (char*, buffers, stored strings): compare by content.
+  char *sa = val_get_charptr(a);
   if (sa != val_emptystr) {
-    sb = val_get_charptr(b);
-
+    char *sb = val_get_charptr(b);
     if (sb != val_emptystr) {
       if (sa == NULL) sa = val_emptystr; // / To avoid calling strcmp
       if (sb == NULL) sb = val_emptystr; // \ with NULL arguments
-
-      return strcmp(sa,sb);
+      return strcmp(sa, sb);
     }
   }
 
-  if (valisnumber(a) && valisnumber(b)) {
-    double da = valtodouble(a);
-    double db = valtodouble(b);
-    return (da > db)? 1 : (da < db) ? -1 : 0 ;
-  }
-  
-  if (valisnumber(a)) return -1; // / Numbers are lower than
-  if (valisnumber(b)) return  1; // \ any other type
+  // Pairs: the encoding VAL_PAIR | l<<32 | r gives lexicographic (l,r)
+  // ordering, consistent with valeq() (bit equality).
+  if (valispair(a) && valispair(b)) return (a.v > b.v) ? 1 : -1;
 
-  return (a.v > b.v)? 1 : (a.v < b.v) ? -1 : 0 ;
+  // Numbers sort below every other type.
+  if (val_isnumber(a)) return -1;
+  if (val_isnumber(b)) return  1;
+
+  // Everything else: raw ordering (a.v != b.v here, so no == 0 case).
+  return (a.v > b.v) ? 1 : -1;
 }
 
 VAL_STATIC_INLINE uint32_t val_hash(val_t v) {

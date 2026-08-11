@@ -15,7 +15,10 @@ struct valptr_vec_s {
   int32_t  sze;
   int32_t  end;
   int32_t  fst;
-  int32_t  buf;
+  int32_t  flg;   // Mode flags (VAL_VEC_MAP...)
+  int32_t  del;   // Tombstoned (deleted) map entries
+  int32_t  dsz;   // Capacity of the dead[] flags array
+  uint8_t *dead;  // Per-entry deleted flags (maps only)
 };
 
 val_t valaux();
@@ -56,21 +59,19 @@ static inline val_t *valvecbase(val_t a) {
 }
 
 static inline int32_t val_count(valptr_vec_t vec_ptr) {
-  return (vec_ptr != NULL) ? (vec_ptr->end - vec_ptr->fst) : 0;
+  if (vec_ptr == NULL) return 0;
+  if (vec_ptr->flg & VAL_VEC_MAP) return vec_ptr->end/2 - vec_ptr->del;
+  return vec_ptr->end - vec_ptr->fst;
 }
 #define valcount(a) val_count(val_vecptr(a))
 
 int val_set_vec(val_t a, int32_t ndx, val_t elm);
 int val_set_map(val_t a, val_t key, val_t elm);
 
-#define valset(a,i,v) _Generic((i), \
-                           char *: val_set_chrptr_ndx, \
-                            val_t: val_set_map, \
-                          default: val_set_vec) (a,i,val(v))
-
-static inline int val_set_chrptr_ndx(val_t a, char *ndx, val_t v) {
-  return val_set_map(a, val(ndx), v);
-}
+// valset() is array-only: the index must be an integer.
+// For maps use valmap(m,key,value).
+#define valset(a,i,v) val_set_vec(a, i, val(v))
+#define valmap(m,k,v) val_set_map(m, val(k), val(v))
 
 #define valins(a,i,e,...) val_ins(a,i,val(e),__VA_ARGS__+0)
 int val_ins(val_t a, int32_t ndx, val_t elm, int32_t rep);
@@ -93,7 +94,12 @@ int val_del_map(val_t a, val_t k);
 
 #define valdel(...) VAL_vrg(val_del_,__VA_ARGS__)
 
-#define val_del_1(a)      val_del_vec(a, -1, -1)
+int val_del_store(val_t v);
+
+static inline int val_del_1(val_t a) {
+  if (valisstored(a)) return val_del_store(a);
+  return val_del_vec(a, -1, -1);
+}
 #define val_del_3(a,f,t)  val_del_vec(a,f,t)
 #define val_del_2(a,ndx)  _Generic((ndx), \
                             char *: val_del_chrptr_ndx, \
@@ -122,6 +128,10 @@ static inline val_t valpop(val_t a) {
 
 static inline int val_clear(valptr_vec_t vec_ptr) {
   vec_ptr->end = vec_ptr->fst = 0;
+  if (vec_ptr->flg & VAL_VEC_MAP) {
+    vec_ptr->del = 0;
+    if (vec_ptr->dead) memset(vec_ptr->dead, 0, vec_ptr->dsz);
+  }
   return 1;
 }
 
@@ -177,20 +187,21 @@ int32_t val_bsearch(val_t a, val_t e, val_cmp_t cmp, val_t aux);
 
 // Stores
 
-#define VAL_NUM_STORES 1
+// Stored strings: val_store() copies a NUL-terminated string into the
+// library-managed arena and returns a val_t handle that behaves as a string
+// in valcmp(), valhash(), valtostr(), valtoptr() and valtoint().
+// Each store keeps a registry of entries (offset, len, deleted) that can be
+// inspected with val_store_sze()/cnt()/top()/len()/offset(); entries are
+// removed with valdel() (tombstone semantics).
+// The arena (val_stores[]) and its types are defined in val.h.
+#define valstore(s) val_store(s)
+val_t val_store(const char *str);
 
-typedef struct val_store_s {
-  uint8_t *data;
-  int32_t  sze;
-  int32_t  end;
-} val_store_t;
-
-extern val_store_t val_stores[VAL_NUM_STORES];
-
-// If you use threads, all these three function are mutex-protected!
-#define valstore(s,...) val_store_(s,__VA_ARGS__+0)
-#define val_store_(s,l) val_store(s,l,_Generic((s), char *: 1, default: 0))
-val_t val_store(void *elm, int32_t len, int32_t isstring);
+int32_t val_store_cnt(int32_t nstore);
+int32_t val_store_sze(int32_t nstore);
+int32_t val_store_top(int32_t nstore);
+int32_t val_store_len(int32_t nstore, int32_t ndx);
+int32_t val_store_offset(int32_t nstore, int32_t ndx);
 
 void *valrecall(val_t x);
 void  valwipe(val_t vstr);
