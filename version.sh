@@ -7,7 +7,7 @@
 # Set the major, minor and patch numbers according to the "Semantic Versioning" rules (https://semver.org)
 VER_MAJOR=0
 VER_MINOR=4
-VER_PATCH=11
+VER_PATCH=12
 
 VER_STAGE=C
 # The development stage (and any additional version info) can be set in VER_STAGE.

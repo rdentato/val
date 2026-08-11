@@ -3,7 +3,7 @@
 #line 4 "val.h"
 
 #ifndef VAL_VERSION
-#define VAL_VERSION 0x0004011C
+#define VAL_VERSION 0x0004012C
 
 #include <stdio.h>
 #include <stdlib.h>
