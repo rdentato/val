@@ -8,6 +8,7 @@ A comprehensive C library for NaN boxing and pointer tagging that efficiently st
   - [Table of Contents](#table-of-contents)
   - [Introduction](#introduction)
     - [Key Features](#key-features)
+    - [Core vs. Library (`val.h` / `vallib`)](#core-vs-library-valh--vallib)
   - [Core Concepts](#core-concepts)
     - [NaN Boxing](#nan-boxing)
     - [Pointer Tagging](#pointer-tagging)
@@ -71,6 +72,27 @@ The **val library** is a high-performance C library that implements NaN boxing a
 - **Memory Efficient**: 64-bit storage for all value types
 - **Type Safe**: Runtime type checking with dedicated predicates
 - **Extensible**: Support for custom pointer types and constants
+
+### Core vs. Library (`val.h` / `vallib`)
+
+The project is split into **two layers**, and it is important to know which one you are using.
+
+**`val.h` — the core (header-only).** It defines the `val_t` type and all value operations: boxing and unboxing, type predicates, comparison and hashing, string conversion, pointers, tags, constants, and pairs. Everything is `static inline`, so there is *nothing to compile or link*: copy the file, include it, and you are done. The core never allocates memory and keeps no mutable global state.
+
+**`vallib.h` + `vallib.c` — the library.** A companion module for everything that needs heap memory or global state: vectors (used as arrays, stacks, queues, and maps), sorting and searching, stored strings (the library-owned arena), and library-managed growable buffers. `vallib.h` is an amalgamation that includes the full core; `vallib.c` is a single translation unit you compile and link.
+
+**Use `val.h` alone when:**
+
+- you only need dynamic values — the 64-bit NaN-boxed type, conversions, comparisons, and hashing;
+- you want a single-file, zero-build, zero-link drop-in (no `.c` to compile, no object to link);
+- you work in a context without heap allocation, or want to pay for container code only if you actually use it.
+
+**Use `vallib` (also) when:**
+
+- you need vectors, stacks, queues, maps, sorting/searching, stored strings, or the library-managed buffers;
+- you are writing a full application against the library and want the shared arena.
+
+**Rule of thumb:** if you do not call any function that allocates (anything documented under [Data Structures](#data-structures), [Stored Strings](#stored-strings), or [Buffer Pointers](#buffer-pointers)), `val.h` is enough. If you link `vallib.c`, you get both layers — mixing is expected and fine.
 
 ---
 
@@ -856,7 +878,9 @@ int main(void) {
 ## Data Structures
 
 The companion module (`vallib.h` + `vallib.c`) provides dynamic data
-structures built on `val_t`. There is a single container type — the **vec** —
+structures built on `val_t` — this is the *library* layer described in
+[Core vs. Library](#core-vs-library-valh--vallib); it is **not** available
+when using `val.h` alone. There is a single container type — the **vec** —
 a dynamically resized array of `val_t` values, that can be used as an array, a
 stack, a queue, or a map depending on the functions you call on it.
 

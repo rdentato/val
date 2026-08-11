@@ -59,18 +59,22 @@ All in one 64-bit word, with efficient runtime checks, comparisons, and hashing.
 
 ## Installation
 
-For the core `val` functions, simply copy `val.h` into your project’s include
-directory, then in your source:
+The project ships as **two layers** — pick the one that matches your needs:
+
+**Core only — `val.h` (header-only).** If you only need the `val_t` type and
+its value operations (boxing, type checks, comparison, hashing, string
+conversion, pointers, constants, pairs), copy `val.h` into your project's
+include directory and include it. No build steps, no linking, no heap
+allocation — `val.h` is a pure single-file header.
 
 ```c
 #include "val.h"
 ```
 
-No build steps required.
-
-For the data structures (`valvec`, stacks, queues, maps, stored strings), copy
-`vallib.h` and `vallib.c` as well, include `vallib.h`, and compile and link
-`vallib.c` with your sources:
+**Full library — `vallib.h` + `vallib.c`.** For the data structures
+(`valvec`, stacks, queues, maps), sorting and searching, library-owned stored
+strings, and library-managed buffers, also copy `vallib.h` and `vallib.c`,
+include `vallib.h`, and compile and link `vallib.c` with your sources:
 
 ```c
 #include "vallib.h"
@@ -79,6 +83,11 @@ For the data structures (`valvec`, stacks, queues, maps, stored strings), copy
 ```sh
 cc myprog.c vallib.c -o myprog
 ```
+
+`vallib.h` includes the whole core, so a program that links `vallib.c` gets
+both layers. As a rule of thumb: if you don't use any allocating function,
+`val.h` alone is enough; if you need vectors, maps, stored strings, or
+growable buffers, use `vallib`.
 
 ---
 
@@ -147,16 +156,6 @@ The `test` directory is also a source of valuable information.
   [https://craftinginterpreters.com/optimization.html](https://craftinginterpreters.com/optimization.html)
 * **IEEE 754 & Architecture Manual**
   Intel® 64 and IA-32 Architectures Software Developer’s Manual, Vol 1 §4.2.2, Table 4-3
-
----
-
-## Changelog
-
-* **0.3.0 Beta** (May 2025)
-
-  * Introduced generic `_Generic` constructors.
-  * Added pointer tags 0–7.
-  * Improved `valcmp` and `valhash` performance.
 
 ---
 
